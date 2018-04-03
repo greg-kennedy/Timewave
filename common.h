@@ -2,20 +2,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
-#include "SDL/SDL.h"
+#include <SDL/SDL.h>
 #ifdef __APPLE__
   #include "SDL_mixer/SDL_mixer.h"
   #include "SDL_image/SDL_image.h"
 
   #include "CoreFoundation/CoreFoundation.h"
 #else
-  #include "SDL/SDL_mixer.h"
-  #include "SDL/SDL_image.h"
+  #include <SDL/SDL_mixer.h>
+  #include <SDL/SDL_image.h>
 #endif
 
-#include "math.h"
-#include "string.h"
+#include "cfg_parse/cfg_parse.h"
 
 #define KEY_UP keys[0]
 #define KEY_DOWN keys[1]
@@ -27,4 +27,3 @@
 #define KEY_START keys[7]
 #define KEY_PAUSE keys[8]
 #define KEY_QUIT keys[9]
-
