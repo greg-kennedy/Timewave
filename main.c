@@ -148,8 +148,8 @@ int main (int argc, char *argv[])
     SDL_WM_SetCaption ("Timewave", NULL);
     SDL_ShowCursor( SDL_DISABLE );
 
-    int audio_rate = cfg_get(cfg,"AUDIO_RATE")
-    Uint16 audio_format = cfg_get(cfg,"AUDIO_FORMAT")
+    int audio_rate = cfg_get(cfg,"AUDIO_RATE");
+    Uint16 audio_format = cfg_get(cfg,"AUDIO_FORMAT");
     int audio_channels = cfg_get(cfg,"AUDIO_CHANNELS");
     int audio_buffers = cfg_get(cfg,"AUDIO_BUFFERS");
 
