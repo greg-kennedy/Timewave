@@ -1,25 +1,9 @@
 /* menu.h - menu */
-#include "common.h"
+#ifndef MENU_H_
+#define MENU_H_
 
-void initmenu();
-void destroymenu();
-void drawmenu();
-int handlemenu();
+struct env_t;
+typedef struct _Mix_Music Mix_Music;
+int state_menu(struct env_t* env, Mix_Music* music);
 
-extern SDL_Surface *screen;
-extern int gamestate;
-
-extern SDL_Surface *tempsurf;
-
-extern int sfxon, muson;
-extern Mix_Music *music;
-
-
-SDL_Surface *checkbox, *mcurs;
-
-SDL_Rect cboxrect, mcrect;
-
-extern SDL_Joystick *joy;
-extern int joysticks;
-
-extern SDLKey keys[10];
+#endif

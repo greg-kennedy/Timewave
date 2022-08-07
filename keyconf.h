@@ -1,14 +1,8 @@
 /* keyconf.h - keyconfig */
-#include "common.h"
+#ifndef KEYCONF_H_
+#define KEYCONF_H_
 
-void initkeyconf();
-void destroykeyconf();
-void drawkeyconf();
-int handlekeyconf();
+struct env_t;
+int state_keyconf(struct env_t* env);
 
-extern SDL_Surface *screen;
-extern int gamestate;
-
-extern SDL_Surface *tempsurf;
-
-extern SDLKey keys[10];
+#endif

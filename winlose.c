@@ -2,190 +2,138 @@
 
 #include "winlose.h"
 
-extern int newjoy;
+#include "common.h"
 
-Uint32 wl_debounce;
+#include "meta_play.h"
 
-void initgameover()
+/* ****************************** */
+// Game Over
+int state_gameover(struct env_t* env, const int score)
 {
-	if (muson==1) {
-		music=Mix_LoadMUS("audio/lose.mod");
-		Mix_PlayMusic(music,-1);
-	}
+	/* Load the resources for this screen */
+	SDL_Surface* bg = load_image("img/ui/gameover.png", 0);
+	if (bg == NULL) return STATE_ERROR;
 
-     SDL_Surface *surf=NULL;
-     surf=IMG_Load("img/ui/gameover.png");
-     tempsurf = SDL_DisplayFormat(surf);
-     SDL_FreeSurface(surf);
-     newjoy = 0;
+	Mix_Music* music = NULL;
+	if (env->mus_works && env->mus_on)
+		music = load_music("audio/lose.mod", 1);
 
-	wl_debounce = SDL_GetTicks() + 1000;
-}
+	/* Require 1-second delay before registering keypress on this scene */
+	const Uint32 wl_debounce = SDL_GetTicks() + 1000;
 
-void destroygameover()
-{
-	 SDL_FreeSurface(tempsurf);
-	Mix_HaltMusic();
-	Mix_FreeMusic(music);
-	music=NULL;
-}
+	/* One-time draw the screen */
+	int dirty = 1;
 
-void drawgameover()
-{    
-     long tempscore,i;
-     SDL_Rect scorerect, tempscorerect;
-	scorerect.h=32;
-	scorerect.w=32;
-	tempscorerect.h=32;
-	tempscorerect.w=32;
-	tempscorerect.y=0;
-
-	SDL_BlitSurface(tempsurf,NULL,screen,NULL);
-	
-    scorerect.y=375;
-	i=450;
-	tempscore=score;
-	while (tempscore > 0)
+	/* Event loop */
+	int state = STATE_GAMEOVER;
+	do
 	{
-          i=i-32;
-          tempscorerect.x=32*(tempscore % 10);
-          scorerect.x=i;
-          SDL_BlitSurface(numbers,&tempscorerect,screen,&scorerect);
-          tempscore=(long)(tempscore/10);
-    }
+		/* Check for events */
+		SDL_Event event;
+		while (SDL_PollEvent (&event))
+		{
+			switch (event.type)
+			{
+				case SDL_VIDEOEXPOSE:
+					dirty = 1;
+					break;
+				case SDL_KEYUP:
+					if ((event.key.keysym.sym == env->KEY_FIRE || event.key.keysym.sym == env->KEY_QUIT || event.key.keysym.sym == env->KEY_START) && wl_debounce < SDL_GetTicks())
+						state = STATE_PLAY_END;
+					break;
+				case SDL_JOYBUTTONUP:
+					if (event.jbutton.which == 0 && event.jbutton.button == 0 && wl_debounce < SDL_GetTicks())
+						state = STATE_PLAY_END;
+					break;
+				case SDL_MOUSEBUTTONUP:
+					state = STATE_PLAY_END;
+					break;
+				case SDL_QUIT:
+					state = STATE_QUIT;
+			}
+		}
 
-    /* Make sure everything is displayed on screen */
-    SDL_Flip (screen);
-    /* Don't run too fast */
-    SDL_Delay (1);
-}
+		if (dirty)
+		{
+			SDL_BlitSurface(bg, NULL, env->screen, NULL);
+			blit_number(env->screen, 450, 375, score);
 
-int handlegameover()
-{
-    SDL_Event event;
-    int retval=0;
+			SDL_Flip (env->screen);
 
-    if (joysticks>0)
-    {
-       if (SDL_JoystickGetButton(joy,0)) {
-         if (newjoy) {
-           if (score>tscore[2]) gamestate=7; else gamestate=0;
-         }
-       } else {
-         newjoy=1;
-       }
-    }
+			dirty = 0;
+		}
 
-    /* Check for events */
-    while (SDL_PollEvent (&event))
-    {
-        switch (event.type)
-        {
-        case SDL_KEYUP:
-             if ((event.key.keysym.sym==KEY_B1 || event.key.keysym.sym==KEY_QUIT || event.key.keysym.sym==KEY_START) && wl_debounce < SDL_GetTicks()){
-               if (score>tscore[2]) gamestate=7; else
-             		gamestate=0;}
-            break;
-        case SDL_MOUSEBUTTONUP:
-               if (score>tscore[2]) gamestate=7; else
-             		gamestate=0;
-             break;
-        case SDL_QUIT:
-            retval = 1;
-            break;
-        default:
-            break;
-        }
-    }
-    return retval;
-}
+		SDL_Delay (1);
+	} while (state == STATE_GAMEOVER);
 
-void initvictory()
-{
-	if (muson==1) {
-		music=Mix_LoadMUS("audio/win.mod");
-		Mix_PlayMusic(music,-1);
-	}
-     SDL_Surface *surf=NULL;
-     surf=IMG_Load("img/ui/victory.png");
-     tempsurf = SDL_DisplayFormat(surf);
-     SDL_FreeSurface(surf);
-     newjoy=0;
-
-	wl_debounce = SDL_GetTicks() + 1000;
-}
-
-void destroyvictory()
-{
-	 SDL_FreeSurface(tempsurf);
-	Mix_HaltMusic();
 	Mix_FreeMusic(music);
-	music=NULL;
+
+	SDL_FreeSurface(bg);
+
+	return state;
 }
 
-void drawvictory()
+int state_victory(struct env_t* env, const int score)
 {
-    long tempscore,i;
-    SDL_Rect scorerect, tempscorerect;
-	scorerect.h=32;
-	scorerect.w=32;
-	tempscorerect.h=32;
-	tempscorerect.w=32;
-	tempscorerect.y=0;
+	/* Load the resources for this screen */
+	SDL_Surface* bg = load_image("img/ui/victory.png", 0);
+	if (bg == NULL) return STATE_ERROR;
 
-	SDL_BlitSurface(tempsurf,NULL,screen,NULL);
-    /* Make sure everything is displayed on screen */
-    
-    scorerect.y=513;
-	i=528;
-	tempscore=score;
-	while (tempscore > 0)
+	Mix_Music* music = NULL;
+	if (env->mus_works && env->mus_on)
+		music = load_music("audio/win.mod", 1);
+
+	/* Require 1-second delay before registering keypress on this scene */
+	const Uint32 wl_debounce = SDL_GetTicks() + 1000;
+
+	/* One-time draw the screen */
+	int dirty = 1;
+
+	/* Event loop */
+	int state = STATE_VICTORY;
+	do
 	{
-          i=i-32;
-          tempscorerect.x=32*(tempscore % 10);
-          scorerect.x=i;
-          SDL_BlitSurface(numbers,&tempscorerect,screen,&scorerect);
-          tempscore=(long)(tempscore/10);
-    }
-    
-    
-    
-    SDL_Flip (screen);
-    /* Don't run too fast */
-    SDL_Delay (1);
-}
+		/* Check for events */
+		SDL_Event event;
+		while (SDL_PollEvent (&event))
+		{
+			switch (event.type)
+			{
+				case SDL_VIDEOEXPOSE:
+					dirty = 1;
+					break;
+				case SDL_JOYBUTTONUP:
+					if (event.jbutton.which == 0 && event.jbutton.button == 0 && wl_debounce < SDL_GetTicks())
+						state = STATE_GAME_NEXT;
+					break;
+				case SDL_KEYUP:
+					if ((event.key.keysym.sym == env->KEY_FIRE || event.key.keysym.sym == env->KEY_QUIT || event.key.keysym.sym == env->KEY_START) && wl_debounce < SDL_GetTicks())
+						state = STATE_GAME_NEXT;
+					break;
+				case SDL_MOUSEBUTTONUP:
+					state = STATE_GAME_NEXT;
+					break;
+				case SDL_QUIT:
+					state = STATE_QUIT;
+			}
+		}
 
-int handlevictory()
-{
-    SDL_Event event;
-    int retval=0;
+		if (dirty)
+		{
+			SDL_BlitSurface(bg, NULL, env->screen, NULL);
+			blit_number(env->screen, 528, 513, score);
 
-    if (joysticks>0)
-    {
-       if (SDL_JoystickGetButton(joy,0)) {
-         if (newjoy) gamestate=4;
-       } else {
-         newjoy=1;
-       }
-    }
-    /* Check for events */
-    while (SDL_PollEvent (&event))
-    {
-        switch (event.type)
-        {
-        case SDL_KEYUP:
-             if ((event.key.keysym.sym==KEY_B1 || event.key.keysym.sym==KEY_QUIT || event.key.keysym.sym==KEY_START) && wl_debounce < SDL_GetTicks())
-             		gamestate=4;
-            break;
-        case SDL_MOUSEBUTTONUP:
-		gamestate=4;
-             break;
-        case SDL_QUIT:
-            retval = 1;
-            break;
-        default:
-            break;
-        }
-    }
-    return retval;
+			SDL_Flip (env->screen);
+
+			dirty = 0;
+		}
+
+		SDL_Delay (1);
+	} while (state == STATE_VICTORY);
+
+	Mix_FreeMusic(music);
+
+	SDL_FreeSurface(bg);
+
+	return state;
 }

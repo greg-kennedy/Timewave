@@ -2,101 +2,90 @@
 
 #include "title.h"
 
-extern int newjoy;
+#include "common.h"
 
-void inittitle()
+#include "meta_ui.h"
+
+/* *************************************************** */
+/* TITLE SCREEN */
+int state_title(struct env_t* env, const int arcade_mode)
 {
-	SDL_Surface *surf=NULL;
-	surf=IMG_Load("img/ui/title.png");
-	tempsurf = SDL_DisplayFormat(surf);
-	SDL_FreeSurface(surf);
+	/* Load the resources for this screen */
+	SDL_Surface* bg = load_image("img/ui/title.png", 0);
+	if (bg == NULL)
+		return STATE_ERROR;
 
-	/* This is the music to play. */
-	if (muson==1 && (!arcade_mode || music == NULL)) {
-		music = Mix_LoadMUS("audio/title.xm");
-		Mix_PlayMusic(music, -1);
-	}
-	newjoy=0;
+	// Five seconds on this screen in Arcade Mode
+	const Uint32 arcade_ticks = SDL_GetTicks() + 5000;
 
-	tscreen_arcade_ticks = SDL_GetTicks() + 5000;
-}
+	/* One-time draw the screen */
+	int dirty = 1;
 
-void destroytitle()
-{
-	SDL_FreeSurface(tempsurf);
-}
-
-void drawtitle()
-{
-	SDL_BlitSurface(tempsurf,NULL,screen,NULL);
-	/* Make sure everything is displayed on screen */
-	SDL_Flip (screen);
-	/* Don't run too fast */
-	SDL_Delay (1);
-}
-
-int handletitle()
-{
-	SDL_Event event;
-	int retval=0;
-
-	if (joysticks>0)
+	/* Event loop */
+	int state = STATE_TITLE;
+	do
 	{
-		if (SDL_JoystickGetButton(joy,0)) {
-			if (newjoy) {
-				if (arcade_mode)
-					gamestate=1;
-				else
-					gamestate=3;
+		SDL_Event event;
+		if (! arcade_mode)
+		{
+			while (SDL_PollEvent(&event))
+			{
+				switch (event.type)
+				{
+					case SDL_VIDEOEXPOSE:
+						dirty = 1;
+						break;
+					case SDL_KEYUP:
+					case SDL_MOUSEBUTTONUP:
+					case SDL_JOYBUTTONUP:
+						state = STATE_MENU;
+						break;
+					case SDL_QUIT:
+						state = STATE_QUIT;
+				}
 			}
 		} else {
-			newjoy=1;
-		}
-	}
+			if (arcade_ticks < SDL_GetTicks())
+				state = STATE_HS;
 
-	if (!arcade_mode)
-	{
-		/* Check for events */
-		while (SDL_PollEvent (&event))
-		{
-			switch (event.type)
+			while (SDL_PollEvent(&event))
 			{
-				case SDL_KEYUP:
-					gamestate=1;
-					break;
-				case SDL_MOUSEBUTTONUP:
-					gamestate=1;
-					break;
-				case SDL_QUIT:
-					retval = 1;
-					break;
-				default:
-					break;
+				switch (event.type)
+				{
+					case SDL_VIDEOEXPOSE:
+						dirty = 1;
+						break;
+					case SDL_KEYUP:
+						if (event.key.keysym.sym == env->KEY_START)
+							state = STATE_PLAY;
+						else if (event.key.keysym.sym == env->KEY_QUIT)
+							state = STATE_QUIT;
+						break;
+					case SDL_MOUSEBUTTONUP:
+					case SDL_JOYBUTTONUP:
+						state = STATE_PLAY;
+						break;
+					case SDL_QUIT:
+						state = STATE_QUIT;
+				}
 			}
 		}
-	} else {
-		if (tscreen_arcade_ticks < SDL_GetTicks())
-			gamestate = 2;
 
-		/* Check for events */
-		while (SDL_PollEvent (&event))
+		/* draw */
+		if (dirty)
 		{
-			switch (event.type)
-			{
-				case SDL_KEYUP:
-					if (event.key.keysym.sym == KEY_START)
-						gamestate=3;
-					else if (event.key.keysym.sym == KEY_QUIT)
-						retval = 1;
-					break;
-				case SDL_QUIT:
-					retval = 1;
-					break;
-				default:
-					break;
-			}
-		}
-	}
+			SDL_BlitSurface(bg, NULL, env->screen, NULL);
 
-	return retval;
+			SDL_Flip(env->screen);
+
+			dirty = 0;
+		}
+
+		SDL_Delay(1);
+
+	} while (state == STATE_TITLE);
+
+	SDL_FreeSurface(bg);
+
+	return state;
 }

@@ -1,23 +1,9 @@
 /* hspick.h - high score colorpick */
-#include "common.h"
+#ifndef HSPICK_H_
+#define HSPICK_H_
 
-void inithspick();
-void destroyhspick();
-void drawhspick();
-int handlehspick();
+struct env_t;
+typedef struct _Mix_Music Mix_Music;
+int state_hspick(struct env_t* env, Mix_Music* music_pause, int score);
 
-extern SDL_Surface *screen;
-extern int gamestate;
-
-extern SDL_Surface *tempsurf;
-SDL_Surface *mcursy;
-
-extern int sfxon, muson;
-extern Mix_Music *music;
-
-extern long score;
-
-extern SDL_Joystick *joy;
-extern int joysticks;
-
-extern SDLKey keys[10];
+#endif

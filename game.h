@@ -1,68 +1,15 @@
 /* game.h - gameplay header */
-#include "common.h"
+#ifndef GAME_H_
+#define GAME_H_
 
-void musicfinished();
-void initgame(int);
-void destroygame();
-void spawn(int);
-void draw();
-int handlegame();
-int updategame();
+struct env_t;
+typedef struct _Mix_Music Mix_Music;
 
-int createbullet(float, float, int, int, float);
-int createenemy(float, float, int, float, float,int);
-int createexplosion(float, float, int);
+// Because there are expensive objects on this screen, provide additional
+//  init_game and shutdown_game methods to trigger preloading.
+int init_game(struct env_t* env);
+void free_game();
 
-void playnoise(int);
+int state_game(struct env_t* env, Mix_Music* music_pause, int level, int* score);
 
-extern SDL_Surface *screen, *numbers;
-extern int gamestate;
-extern long score;
-
-struct bullet
-{
-       float x;
-       float y;
-       int theta;
-       float speed;
-       int type;
-};
-
-struct enemy
-{
-       float x;
-       float y;
-       int type;
-       float arg1;
-       float arg2;
-       float arg3;
-       int life;
-};
-
-struct spawninfo
-{
-       int when;
-       float x;
-       float y;
-       int type;
-       float arg1;
-       float arg2;
-       int life;
-};
-
-struct explosion
-{
-       float x;
-       float y;
-       float img;
-       int type;
-};
-
-extern Mix_Music *music;
-extern int muson;
-extern int sfxon;
-
-extern SDL_Joystick *joy;
-extern int joysticks;
-
-extern SDLKey keys[10];
+#endif

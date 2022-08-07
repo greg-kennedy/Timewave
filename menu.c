@@ -1,134 +1,142 @@
 /* menu.c - menu */
-
 #include "menu.h"
 
-long mx=0, my=0;
+#include "common.h"
+#include "meta_ui.h"
 
-extern int newjoy;
-
-void initmenu()
+/* *************************************************** */
+/* MAIN MENU */
+int state_menu(struct env_t* env, Mix_Music* music)
 {
-     SDL_Surface *surf=NULL;
-     surf=IMG_Load("img/ui/menu.png");
-     tempsurf = SDL_DisplayFormat(surf);
-     SDL_FreeSurface(surf);
-     surf=IMG_Load("img/ui/checked.png");
-     checkbox = SDL_DisplayFormat(surf);
-     SDL_FreeSurface(surf);
-     surf=IMG_Load("img/ui/cursor.png");
-     SDL_SetColorKey(surf, SDL_SRCCOLORKEY | SDL_RLEACCEL, SDL_MapRGB(surf->format,0xFF,0xFF,0xFF));
-     mcurs = SDL_DisplayFormat(surf);
-     SDL_FreeSurface(surf);
+	/* Load the resources for this screen */
+	SDL_Surface* bg = load_image("img/ui/menu.png", 0);
+	if (bg == NULL)
+		return STATE_ERROR;
 
-	cboxrect.w=checkbox->w;
-	cboxrect.h=checkbox->h;
-	cboxrect.x=559;
-
-	mcrect.w=mcurs->w;
-	mcrect.h=mcurs->h;
-	newjoy = 0;
-}
-
-void destroymenu()
-{
-	 SDL_FreeSurface(tempsurf);
-	 SDL_FreeSurface(checkbox);
-	 SDL_FreeSurface(mcurs);
-}
-
-void drawmenu()
-{
-	SDL_BlitSurface(tempsurf,NULL,screen,NULL);
-
-	if (muson)
+	SDL_Surface* checkbox = load_image("img/ui/checked.png", 0);
+	if (checkbox == NULL)
 	{
-		cboxrect.y=311;
-		SDL_BlitSurface(checkbox,NULL,screen,&cboxrect);
-	}
-	if (sfxon)
-	{
-		cboxrect.y=370;
-		SDL_BlitSurface(checkbox,NULL,screen,&cboxrect);
+		SDL_FreeSurface(bg);
+		return STATE_ERROR;
 	}
 
-    mcrect.x=mx;
-    mcrect.y=my;
-    SDL_BlitSurface(mcurs,NULL,screen,&mcrect);
+	SDL_Rect cboxrect;
+	cboxrect.x = 559;
 
-    /* Make sure everything is displayed on screen */
-    SDL_Flip (screen);
-    /* Don't run too fast */
-    SDL_Delay (1);
-}
+	// mouse state
+	int mx, my;
+	SDL_GetMouseState(&mx, &my);
 
-int handlemenu()
-{
-    SDL_Event event;
-    int retval=0;
+	/* One-time draw the screen */
+	int dirty = 1;
 
-    /* Check for events */
-    while (SDL_PollEvent (&event))
-    {
-        switch (event.type)
-        {
-        case SDL_KEYUP:
-            if (event.key.keysym.sym == KEY_QUIT)
-                retval=1;
-            else
-                gamestate=3;
-            break;
-        case SDL_MOUSEBUTTONUP:
-		if (event.button.x>98 && event.button.x<299)
+	/* Event loop */
+	int state = STATE_MENU;
+	do
+	{
+		/* read events */
+		SDL_Event event;
+		while (SDL_PollEvent (&event))
 		{
-			if (event.button.y>137 && event.button.y<206)
-		             gamestate=3;
-			if (event.button.y>314 && event.button.y<383)
-				gamestate=2;
-			if (event.button.y>486 && event.button.y<555)
-				retval=1;
+			switch (event.type)
+			{
+				case SDL_VIDEOEXPOSE:
+					dirty = 1;
+					break;
+				case SDL_KEYUP:
+					if (event.key.keysym.sym == env->KEY_QUIT)
+						state = STATE_QUIT;
+					else
+						state = STATE_PLAY;
+					break;
+				case SDL_JOYBUTTONUP:
+					if (event.jbutton.which == 0) {
+						if (event.jbutton.button == 0)
+							state = STATE_PLAY;
+						else if (event.jbutton.button == 1)
+							state = STATE_HS;
+					}
+					break;
+				case SDL_MOUSEBUTTONUP:
+					mx = event.button.x;
+					my = event.button.y;
+					if (mx > 98 && mx < 299)
+					{
+						if (my > 137 && my < 206)
+							state = STATE_PLAY;
+						if (my > 314 && my < 383)
+							state = STATE_HS;
+						if (my > 486 && my < 555)
+							state = STATE_QUIT;
+					}
+					else if (mx > 550 && mx < 692)
+					{
+						if (my > 312 && my < 331)
+						{
+							if (env->mus_on == 0)
+							{
+								env->mus_on = 1;
+								Mix_PlayMusic(music, -1);
+							} else {
+								env->mus_on = 0;
+								if (Mix_PlayingMusic()) Mix_HaltMusic();
+							}
+						}
+						else if (event.button.y > 369 && event.button.y < 388)
+						{
+							env->sfx_on = ! env->sfx_on;
+						}
+						else if (my > 410 && my < 468)
+						{
+							state = STATE_KEYCONF;
+						}
+					}
+					dirty = 1;
+					break;
+				case SDL_MOUSEMOTION:
+					mx = event.motion.x;
+					my = event.motion.y;
+					dirty = 1;
+					break;
+				case SDL_QUIT:
+					state = STATE_QUIT;
+			}
 		}
-		if (event.button.x>550 && event.button.x<692)
+
+		/* draw screen */
+		if (dirty)
 		{
-			if (event.button.y>312 && event.button.y<331)
+			SDL_BlitSurface(bg, NULL, env->screen, NULL);
+
+			// checkboxes
+			if (env->mus_on)
 			{
-				if (muson==0)
-				{
-					muson=1;
-					Mix_PlayMusic(music,-1);
-				}else{
-					muson=0;
-					Mix_HaltMusic();
-				}
+				cboxrect.y = 311;
+				SDL_BlitSurface(checkbox, NULL, env->screen, &cboxrect);
 			}
-			if (event.button.y>369 && event.button.y<388)
-				sfxon=(sfxon==0 ? 1 : 0);
-			if (event.button.y>410 && event.button.y<468)
+			if (env->sfx_on)
 			{
-		             gamestate=8;
+				cboxrect.y = 370;
+				SDL_BlitSurface(checkbox, NULL, env->screen, &cboxrect);
 			}
+
+			// mouse cursor
+			SDL_Rect mcrect;
+			mcrect.x = mx;
+			mcrect.y = my;
+			SDL_BlitSurface(env->cursor, NULL, env->screen, &mcrect);
+
+			SDL_Flip(env->screen);
+
+			dirty = 0;
 		}
-             break;
-        case SDL_MOUSEMOTION:
-             mx=event.motion.x;
-             my=event.motion.y;
-             break;
-        case SDL_QUIT:
-            retval = 1;
-            break;
-        default:
-            break;
-        }
-    }
-    
-    if (joysticks>0)
-    {
-       if (SDL_JoystickGetButton(joy,0)) {
-         if (newjoy) gamestate=3;
-       } else if (SDL_JoystickGetButton(joy,1)) {
-         if (newjoy) gamestate=2;
-       } else {
-         newjoy=1;
-       }
-    }
-    return retval;
+
+		SDL_Delay(1);
+
+	} while (state == STATE_MENU);
+
+	SDL_FreeSurface(checkbox);
+	SDL_FreeSurface(bg);
+
+	return state;
 }

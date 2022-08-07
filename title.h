@@ -1,20 +1,8 @@
 /* title.h - title screen */
-#include "common.h"
+#ifndef TITLE_H_
+#define TITLE_H_
 
-void inittitle();
-void destroytitle();
-void drawtitle();
-int handletitle();
+struct env_t;
+int state_title(struct env_t* env, int arcade_mode);
 
-extern SDL_Surface *screen;
-extern int gamestate, muson;
-
-extern SDL_Surface *tempsurf;
-extern Mix_Music *music;   /* SDL_Mixer stuff here */
-
-extern SDL_Joystick *joy;
-extern int joysticks;
-
-extern int arcade_mode;
-extern SDLKey keys[10];
-Uint32 tscreen_arcade_ticks;
+#endif

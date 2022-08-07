@@ -1,28 +1,10 @@
-/* hs.h - high score table */
-#include "common.h"
+/* winlose.h - victory and game over screens */
+#ifndef WINLOSE_H_
+#define WINLOSE_H_
 
-void initgameover();
-void destroygameover();
-void drawgameover();
-int handlegameover();
+struct env_t;
 
-void initvictory();
-void destroyvictory();
-void drawvictory();
-int handlevictory();
+int state_victory(struct env_t* env, int score);
+int state_gameover(struct env_t* env, int score);
 
-extern SDL_Surface *screen, *numbers;
-extern int gamestate;
-
-extern SDL_Surface *tempsurf;
-
-extern int sfxon, muson;
-extern Mix_Music *music;   /* SDL_Mixer stuff here */
-
-extern long score;
-extern int tscore[3];
-
-extern SDL_Joystick *joy;
-extern int joysticks;
-
-extern SDLKey keys[10];
+#endif
