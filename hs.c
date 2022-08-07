@@ -2,155 +2,112 @@
 
 #include "hs.h"
 
-extern int tscore[3];
-extern int red[3];
-extern int green[3];
-extern int blue[3];
+#include "common.h"
 
-int newjoy;
+#include "meta_ui.h"
 
-void iniths()
+/* *************************************************** */
+/* HIGH SCORE DISPLAY */
+int state_hs(struct env_t* env, const int arcade_mode)
 {
-     SDL_Surface *surf=NULL;
-     surf=IMG_Load("img/ui/hs.png");
-     tempsurf = SDL_DisplayFormat(surf);
-     SDL_FreeSurface(surf);
-     newjoy=0;
+	/* Load the resources for this screen */
+	SDL_Surface *bg = load_image("img/ui/hs.png", 0);
+	if (bg == NULL)
+		return STATE_ERROR;
 
-	hs_arcade_ticks = SDL_GetTicks() + 5000;
-}
+	// generate the three color values for the banner
+	Uint32 color[3];
+	for (int i = 0; i < 3; i ++)
+		color[i] = SDL_MapRGB(env->screen->format, env->hs_red[i], env->hs_green[i], env->hs_blue[i]);
 
-void destroyhs()
-{
-	 SDL_FreeSurface(tempsurf);
-}
+	// banner squares
+	SDL_Rect colobox;
+	colobox.w = 64;
+	colobox.h = 64;
+	colobox.x = 128;
 
-void drawhs()
-{
-     int i;
-     SDL_Rect colobox;
-     long tempscore;
-     SDL_Rect scorerect, tempscorerect;
+	// Five seconds on this screen in Arcade Mode
+	const Uint32 arcade_ticks = SDL_GetTicks() + 5000;
 
-	SDL_BlitSurface(tempsurf,NULL,screen,NULL);
+	/* One-time draw the screen */
+	int dirty = 1;
 
-	scorerect.h=32;
-	scorerect.w=32;
-	tempscorerect.h=32;
-	tempscorerect.w=32;
-	tempscorerect.y=0;
-
-     colobox.w=64;
-     colobox.h=64;
-     colobox.x=128;
-     colobox.y=128;
-     SDL_FillRect(screen,&colobox,SDL_MapRGB(screen->format,red[0],
-        green[0],blue[0]));
-     colobox.y=224;
-     SDL_FillRect(screen,&colobox,SDL_MapRGB(screen->format,red[1],
-        green[1],blue[1]));
-     colobox.y=320;
-     SDL_FillRect(screen,&colobox,SDL_MapRGB(screen->format,red[2],
-        green[2],blue[2]));
-
-    scorerect.y=142;
-	i=500;
-	tempscore=tscore[0];
-	while (tempscore > 0)
+	/* Event loop */
+	int state = STATE_HS;
+	do
 	{
-          i=i-32;
-          tempscorerect.x=32*(tempscore % 10);
-          scorerect.x=i;
-          SDL_BlitSurface(numbers,&tempscorerect,screen,&scorerect);
-          tempscore=(long)(tempscore/10);
-    }
+		SDL_Event event;
+		if (! arcade_mode) {
+			while (SDL_PollEvent (&event))
+			{
+				switch (event.type)
+				{
+					case SDL_VIDEOEXPOSE:
+						dirty = 1;
+						break;
+					case SDL_KEYUP:
+					case SDL_MOUSEBUTTONUP:
+					case SDL_JOYBUTTONUP:
+						state = STATE_MENU;
+						break;
+					case SDL_QUIT:
+						state = STATE_QUIT;
+				}
+			}
+		} else {
+			if (arcade_ticks < SDL_GetTicks())
+				state = STATE_HS;
 
-    scorerect.y=238;
-	i=500;
-	tempscore=tscore[1];
-	while (tempscore > 0)
-	{
-          i=i-32;
-          tempscorerect.x=32*(tempscore % 10);
-          scorerect.x=i;
-          SDL_BlitSurface(numbers,&tempscorerect,screen,&scorerect);
-          tempscore=(long)(tempscore/10);
-    }
+			while (SDL_PollEvent(&event))
+			{
+				switch (event.type)
+				{
+					case SDL_VIDEOEXPOSE:
+						dirty = 1;
+						break;
+					case SDL_KEYUP:
+						if (event.key.keysym.sym == env->KEY_START)
+							state = STATE_PLAY;
+						else if (event.key.keysym.sym == env->KEY_QUIT)
+							state = STATE_QUIT;
+						break;
+					case SDL_MOUSEBUTTONUP:
+					case SDL_JOYBUTTONUP:
+						state = STATE_PLAY;
+						break;
+					case SDL_QUIT:
+						state = STATE_QUIT;
+				}
+			}
+		}
 
-    scorerect.y=334;
-	i=500;
-	tempscore=tscore[2];
-	while (tempscore > 0)
-	{
-          i=i-32;
-          tempscorerect.x=32*(tempscore % 10);
-          scorerect.x=i;
-          SDL_BlitSurface(numbers,&tempscorerect,screen,&scorerect);
-          tempscore=(long)(tempscore/10);
-    }
+		if (dirty) {
+			// background image
+			SDL_BlitSurface(bg, NULL, env->screen, NULL);
 
-    /* Make sure everything is displayed on screen */
-    SDL_Flip (screen);
-    /* Don't run too fast */
-    SDL_Delay (1);
-}
+			// three color banners
+			colobox.y = 128;
+			SDL_FillRect(env->screen, &colobox, color[0]);
+			colobox.y = 224;
+			SDL_FillRect(env->screen, &colobox, color[1]);
+			colobox.y = 320;
+			SDL_FillRect(env->screen, &colobox, color[2]);
 
-int handlehs()
-{
-    SDL_Event event;
-    int retval=0;
+			// high score numbers
+			blit_number(env->screen, 500, 142, env->hs_score[0]);
+			blit_number(env->screen, 500, 238, env->hs_score[1]);
+			blit_number(env->screen, 500, 334, env->hs_score[2]);
 
-    if (joysticks>0)
-    {
-       if (SDL_JoystickGetButton(joy,0)) {
-         if (newjoy) { if (arcade_mode) gamestate=1; else gamestate=3; }
-       } else {
-         newjoy=1;
-       }
-    }
+			SDL_Flip(env->screen);
 
-if (!arcade_mode)
-{
-    /* Check for events */
-    while (SDL_PollEvent (&event))
-    {
-        switch (event.type)
-        {
-        case SDL_KEYUP:
-		gamestate=1;
-            break;
-        case SDL_MOUSEBUTTONUP:
-		gamestate=1;
-             break;
-        case SDL_QUIT:
-            retval = 1;
-            break;
-        default:
-            break;
-        }
-    }
-} else {
-  if (hs_arcade_ticks < SDL_GetTicks()) gamestate=0;
-    /* Check for events */
-    while (SDL_PollEvent (&event))
-    {
-        switch (event.type)
-        {
-        case SDL_KEYUP:
-		if (event.key.keysym.sym == KEY_START)
-			gamestate=3;
-		else if (event.key.keysym.sym == KEY_QUIT)
-			retval=1;
-            break;
-        case SDL_QUIT:
-            retval = 1;
-            break;
-        default:
-            break;
-        }
-    }
+			dirty = 0;
+		}
 
+		SDL_Delay(1);
 
-}
-    return retval;
+	} while (state == STATE_HS);
+
+	SDL_FreeSurface(bg);
+
+	return state;
 }

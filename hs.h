@@ -1,22 +1,8 @@
 /* hs.h - high score table */
-#include "common.h"
+#ifndef HS_H_
+#define HS_H_
 
-void iniths();
-void destroyhs();
-void drawhs();
-int handlehs();
+struct env_t;
+int state_hs(struct env_t* env, int arcade_mode);
 
-extern SDL_Surface *screen, *numbers;
-extern int gamestate;
-
-extern SDL_Surface *tempsurf;
-
-extern int sfxon, muson;
-
-extern SDL_Joystick *joy;
-extern int joysticks;
-
-extern int arcade_mode;
-extern SDLKey keys[10];
-Uint32 hs_arcade_ticks;
-
+#endif
