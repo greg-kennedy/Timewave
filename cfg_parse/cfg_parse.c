@@ -422,7 +422,7 @@ void cfg_delete(struct cfg_struct* cfg, const char* key)
 {
   char* tkey;
   struct cfg_node* cur;
-  struct cfg_node* prev;
+  struct cfg_node* prev = NULL;
 
   /* safety check: null input */
   if (cfg == NULL || cfg->head == NULL || key == NULL) return;
@@ -500,7 +500,7 @@ void cfg_prune(struct cfg_struct* cfg, const char* keys[], const size_t count)
   size_t i, j;
 
   struct cfg_node* cur;
-  struct cfg_node* prev;
+  struct cfg_node* prev = NULL;
 
   /* safety check: null input */
   if (cfg == NULL || cfg->head == NULL || keys == NULL || count == 0 ||

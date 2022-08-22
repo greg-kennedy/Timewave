@@ -7,7 +7,7 @@ static SDL_Surface* numbers;
 /* ************************************************************************************************************* */
 int init_common()
 {
-	numbers = load_image("img/ui/nums.png", 1);
+	numbers = load_image("img/ui/nums.png", 3);
 	if (numbers == NULL) return 1;
 
 	return 0;
@@ -32,7 +32,11 @@ SDL_Surface* load_image(const char* path, const int alpha)
 	if (alpha)
 	{
 		// try to set the alpha chanel to Magic Pink
-		if (SDL_SetColorKey(img, SDL_SRCCOLORKEY | SDL_RLEACCEL, SDL_MapRGB(img->format, 0xFF, 0x00, 0xFF)) != 0)
+		int flags = SDL_SRCCOLORKEY;
+		// RLE acceleration enabled by setting bit 2 - this is good for bg and overlay,
+		//  not so much for bullets and enemy images
+		if (alpha & 0x02) flags |= SDL_RLEACCEL;
+		if (SDL_SetColorKey(img, flags, SDL_MapRGB(img->format, 0xFF, 0x00, 0xFF)) != 0)
 			fprintf(stderr, "load_image_alpha: Warning: Failed to set color key for image '%s': %s\n", path, SDL_GetError());
 	}
 

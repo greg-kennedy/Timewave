@@ -52,6 +52,9 @@ struct env_t
 	int hs_red[3];
 	int hs_green[3];
 	int hs_blue[3];
+	
+	// cheat keys enabled?
+	int debug;
 };
 
 /* Init and shutdown things needed (below) */

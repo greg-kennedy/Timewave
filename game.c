@@ -1,30 +1,40 @@
 /* game.c - gameplay */
 
+/*
+  All gameplay takes place on an 800x600 screen.
+*/
 #include "game.h"
 
+#define _USE_MATH_DEFINES
 #include <math.h>
+
+#ifndef min
+#define min(X,Y) ((X) < (Y) ? (X) : (Y))
+#endif
 
 #include "common.h"
 
 #include "meta_play.h"
 
-#define SCROLLSPEED 4
-#define EXPLOSPEED 4
-//#define SHIPSPEED 1.5
+#define SCROLLSPEED 1.0/15.0
+#define EXPLOSPEED 0.005
+#define SHIPSPEED 0.25
+#define BARSPEED 0.25
 
 /* num imgs to load */
 #define MAXSHIPS 4
 #define MAXBULS 5
-#define MAXENS 255
+#define MAXENS 22
 #define MAXEXP 5
-
-#define PI 3.14159265358
+#define MAXSTRIPS 42
 
 /* max num on screen */
 #define SCREENBUL 500
 #define SCREENE 32
 #define ALLSPAWN 128
 #define SCREENEX 16
+
+#define LVLSIZE 128
 
 /* Sample names */
 #define SLOW 0
@@ -42,43 +52,57 @@
 
 /* ************************************************************** */
 // STRUCT DEFINITIONS
-struct bullet
-{
-	float x;
-	float y;
-	int theta;
-	float speed;
-	int type;
+//  loaded from file
+struct spawninfo {
+	unsigned char when;
+	unsigned char type;
+	unsigned short x;
+	unsigned short y;
+	short arg1;
+	short arg2;
 };
 
-struct enemy
-{
+// object pools
+struct bullet {
+	unsigned char type;
 	float x;
 	float y;
-	int type;
-	float arg1;
-	float arg2;
-	float arg3;
-	int life;
+	float dx;
+	float dy;
 };
 
-struct spawninfo
-{
-	int when;
+struct enemy {
+	unsigned char type;
+	short life;
 	float x;
 	float y;
-	int type;
-	float arg1;
-	float arg2;
-	int life;
+	short arg1;
+	short arg2;
+
+	short timer;
 };
 
-struct explosion
-{
-	float x;
+struct explosion {
+	unsigned char type;
+	float timer;
+	short x;
 	float y;
-	float img;
-	int type;
+};
+
+/* ************************************************************** */
+// CONSTANTS
+static const unsigned int scores[22] = {
+	50, 250, 100, 200, 250, 500, 0,
+	500, 25, 0,
+	10, 10, 10, 0,
+	100000, 100000, 100000,
+	10000, 20000, 30000, 40000, 50000
+};
+
+static const short hp[22] = {
+	1, 4, 2, 3, 5, 7, SHRT_MAX, 7,
+	1, SHRT_MAX, 1, 1, 1, 1,
+	500, 500, 500, 100, 100, 100, 100, 100
 };
 
 /* ************************************************************** */
@@ -89,64 +113,52 @@ static struct explosion explo[SCREENEX];
 
 /* ************************************************************** */
 // PRELOADED Resources
-static Mix_Chunk* chunk_up;
-static Mix_Chunk* chunk_down;
-static Mix_Chunk* chunk_sfx[3][5];
+static Mix_Chunk * chunk_up;
+static Mix_Chunk * chunk_down;
+static Mix_Chunk * chunk_sfx[3][5];
 
-static Mix_Music* music_boss;
+static Mix_Music * music_boss;
 
-static SDL_Surface* bg;
-static SDL_Surface* img_pause;
-static SDL_Surface* img_overlay[3];
-static SDL_Surface* img_player[MAXSHIPS];
-static SDL_Surface* img_shot[MAXBULS];
-static SDL_Surface* img_enemy[MAXENS];
-static SDL_Surface* img_explo[MAXEXP*5];
-
-static float sintbl[360];
-
-// TODO: this is bad
-//float rate;
+static SDL_Surface * bg;
+static SDL_Surface * img_pause;
+static SDL_Surface * img_overlay[3];
+static SDL_Surface * img_player[MAXSHIPS];
+static SDL_Surface * img_shot[MAXBULS];
+static SDL_Surface * img_enemy[MAXENS];
+static SDL_Surface * img_explo[MAXEXP * 5];
 
 /* ************************************************************** */
 // SHARED GAME DATA INIT / PRELOAD
-int init_game(struct env_t* env)
+int init_game(struct env_t * env)
 {
+	int i;
 	char buffer[30];
-
-	for (int i = 0;i<360;i++)
-		sintbl[i] = sin(PI * (float)i / 180);
 
 	/* LOAD ALL IMAGES */
 	bg = load_image("img/gfx/bg.png", 0);
-	img_pause = load_image("img/ui/paused.png", 1);
+	img_pause = load_image("img/ui/paused.png", 3);
 
-	for (int i = 0;i<3;i++)
-	{
+	for (i = 0; i < 3; i++) {
 		sprintf(buffer, "img/gfx/top%d.png", i);
-		img_overlay[i] = load_image(buffer, 1);
+		img_overlay[i] = load_image(buffer, 3);
 	}
 
-	for (int i = 0;i<MAXSHIPS;i++)
-	{
+	for (i = 0; i < MAXSHIPS; i++) {
 		sprintf(buffer, "img/gfx/ship%d.png", i);
 		img_player[i] = load_image(buffer, 1);
 	}
 
-	for (int i = 0;i<MAXENS;i++)
-	{
+	for (i = 0; i < MAXENS; i++) {
 		sprintf(buffer, "img/gfx/en%d.png", i);
 		img_enemy[i] = load_image(buffer, 1);
 	}
 
-	for (int i = 0;i<MAXEXP*5;i++)
-	{
+	for (i = 0; i < MAXEXP * 5; i++) {
 		sprintf(buffer, "img/gfx/exp%d.png", i);
-		img_explo[i] = load_image(buffer, 1);
+		img_explo[i] = load_image(buffer, 3);
 	}
 
-	for (int i = 0;i<MAXBULS;i++)
-	{
+	for (i = 0; i < MAXBULS; i++) {
 		sprintf(buffer, "img/gfx/bul%d.png", i);
 		img_shot[i] = load_image(buffer, 1);
 	}
@@ -175,7 +187,7 @@ int init_game(struct env_t* env)
 	// BOSS music
 	if (env->mus_works && env->mus_on)
 		music_boss = load_music("audio/boss.mod", 0);
-	
+
 	return 0;
 }
 
@@ -183,30 +195,32 @@ int init_game(struct env_t* env)
 // SHARED GAME FREE
 void free_game()
 {
+	int i, j;
 	/* Images */
 	SDL_FreeSurface(bg);
 	SDL_FreeSurface(img_pause);
 
-	for (int i = 0;i<MAXSHIPS;i++)
+	for (i = 0; i < MAXSHIPS; i++)
 		SDL_FreeSurface(img_player[i]);
 
-	for (int i = 0;i<MAXEXP*5;i++)
+	for (i = 0; i < MAXEXP * 5; i++)
 		SDL_FreeSurface(img_explo[i]);
 
-	for (int i = 0;i<3;i++)
+	for (i = 0; i < 3; i++)
 		SDL_FreeSurface(img_overlay[i]);
 
-	for (int i = 0;i<MAXBULS;i++)
+	for (i = 0; i < MAXBULS; i++)
 		SDL_FreeSurface(img_shot[i]);
 
-	for (int i = 0;i<MAXENS;i++)
+	for (i = 0; i < MAXENS; i++)
 		SDL_FreeSurface(img_enemy[i]);
 
 	// Sound FX
 	Mix_FreeChunk(chunk_up);
 	Mix_FreeChunk(chunk_down);
-	for (int i = 0; i < 3; i ++)
-		for (int j = 0; j < 5; j ++)
+
+	for (i = 0; i < 3; i ++)
+		for (j = 0; j < 5; j ++)
 			Mix_FreeChunk(chunk_sfx[i][j]);
 
 	// Music
@@ -214,918 +228,1113 @@ void free_game()
 }
 
 // Trigger a sound effect, with panning.
-static void playnoise(const int sample, const int rate, const int x)
+static void playnoise(const int sample, const int rate, const float x)
 {
-	Mix_Chunk* chunk;
+	Mix_Chunk * chunk;
 
 	if (sample == 5) chunk = chunk_up;
 	else if (sample == 6) chunk = chunk_down;
 	else chunk = chunk_sfx[rate][sample];
 
-	if (chunk != NULL)
-	{
+	if (chunk != NULL) {
 		// TODO: possibly kill oldest channel to make room for a new sample
 		int channel = Mix_PlayChannel(-1, chunk, 0);
-		if (channel >= 0)
-			Mix_SetPanning(channel, x, 254 - x);
+
+		if (channel >= 0) {
+			int p = 256.0 / 800.0 * x;
+			Mix_SetPanning(channel, p, 255 - p);
+		}
 	}
 }
 
 // Add a bullet to the bullet object pool
-static int createbullet(const float x, const float y, const int type, const int theta, const float speed)
+static int createbullet(const unsigned char type, const unsigned char theta, const float x, const float y, const float speed)
 {
 	int i;
-	for(i = 0;i<SCREENBUL;i++)
-		if (bullets[i].type == 0)
-		{
+
+	for (i = 0; i < SCREENBUL; i++)
+		if (bullets[i].type == 0) {
 			bullets[i].type = type;
-			bullets[i].x = x;
-			bullets[i].y = y;
-			bullets[i].theta = theta;
-			bullets[i].speed = speed;
+			bullets[i].x = x - img_shot[type - 1]->w / 2;
+			bullets[i].y = y - img_shot[type - 1]->h / 2;
+			bullets[i].dx = speed * cos(M_PI / 128.0 * theta);
+			bullets[i].dy = speed * -sin(M_PI / 128.0 * theta);
+
 			break;
 		}
 
 	return (i == SCREENBUL);
 }
 
-// Create an explosion in the explosion pool
-static int createexplosion(const float x, const float y, const int type)
+// Create an explosion in the explosion pool centered at x, y
+static int createexplosion(const unsigned char type, const short x, const short y)
 {
 	int i;
-	for(i = 0;i<SCREENEX;i++)
-		if (explo[i].type == 0)
-		{
+
+	for (i = 0; i < SCREENEX; i++)
+		if (explo[i].type == 0) {
 			explo[i].type = type;
-			explo[i].x = x;
-			explo[i].y = y;
-			explo[i].img = 0;
+			explo[i].timer = 0;
+			explo[i].x = x - img_explo[5 * (type - 1)]->w / 2;
+			explo[i].y = y - img_explo[5 * (type - 1)]->h / 2;
 			break;
 		}
+
 	return (i == SCREENEX);
 }
 
 // Create an enemy in the enemy pool
-static int createenemy(float x, float y, int type, float arg1, float arg2, int life)
+static int createenemy(const unsigned char type, const short x, const short y, const short arg1, const short arg2)
 {
 	int i;
-	for(i = 0;i<SCREENE;i++)
-		if (elist[i].type == 0)
-		{
+
+	for (i = 0; i < SCREENE; i++)
+		if (elist[i].type == 0) {
 			elist[i].type = type;
+			elist[i].life = hp[type - 1];
 			elist[i].x = x;
 			elist[i].y = y;
 			elist[i].arg1 = arg1;
 			elist[i].arg2 = arg2;
-			elist[i].arg3 = 0;
-			elist[i].life = life;
+			elist[i].timer = 0;
 			break;
 		}
+
 	return (i == SCREENE);
+}
+
+static Uint32 get_pixel(const SDL_Surface *surface, const int x, const int y)
+{
+	const int bpp = surface->format->BytesPerPixel;
+	/* Here p is the address to the pixel we want to retrieve */
+	const Uint8 *p = (Uint8 *)surface->pixels + y * surface->pitch + x * bpp;
+
+	switch (bpp)
+	{
+	case 1:
+		return *p;
+		break;
+
+	case 2:
+		return *(Uint16 *)p;
+		break;
+
+	case 3:
+		if (SDL_BYTEORDER == SDL_BIG_ENDIAN)
+			return p[0] << 16 | p[1] << 8 | p[2];
+		else
+			return p[0] | p[1] << 8 | p[2] << 16;
+		break;
+
+	case 4:
+		return *(Uint32 *)p;
+		break;
+
+	default:
+		return 0;       /* shouldn't happen, but avoids warnings */
+	}
+}
+
+// Pixel-perfect collision between two transparent surfaces
+static int check_pixel_collision(const int x1, const int y1, const int x2, const int y2, SDL_Surface * img1, SDL_Surface * img2)
+{
+	int offset_1_x , offset_2_x, offset_1_y, offset_2_y, w, h, x, y;
+
+	// early rejection
+	if (x1 + img1->w <= x2) return 0;
+	if (x2 + img2->w <= x1) return 0;
+	if (y1 + img1->h <= y2) return 0;
+	if (y2 + img2->h <= y1) return 0;
+
+	// determine the overlapping rectangle boundaries
+	if (x1 < x2) { offset_1_x = x2 - x1; offset_2_x = 0; }
+	else { offset_1_x = 0; offset_2_x = x1 - x2; }
+	w = min(img1->w - offset_1_x, img2->w - offset_2_x);
+
+	if (y1 < y2) { offset_1_y = y2 - y1; offset_2_y = 0; }
+	else { offset_1_y = 0; offset_2_y = y1 - y2; }
+	h = min(img1->h - offset_1_y, img2->h - offset_2_y);
+
+	/*
+	fprintf(stderr, "Checking collision between img1 (%d, %d, %d, %d) and img2(%d, %d, %d, %d): o1x=%d o1y=%d o2x=%d o2y=%d w=%d h=%d\n",
+		x1, y1, img1->w, img1->h,
+		x2, y2, img2->w, img2->h,
+		offset_1_x, offset_1_y, offset_2_x, offset_2_y, w, h
+	);
+	*/
+
+	if (SDL_MUSTLOCK(img1)) SDL_LockSurface(img1);
+	if (SDL_MUSTLOCK(img2)) SDL_LockSurface(img2);
+
+	for (y = 0; y < h; y++)
+	{
+		for (x = 0; x < w; x++)
+		{
+			Uint8 r, g, b;
+
+			SDL_GetRGB(get_pixel(img1, x+offset_1_x, y + offset_1_y), img1->format, &r, &g, &b);
+			if (r != 0xFF || g != 0 || b != 0xFF)
+			{
+				SDL_GetRGB(get_pixel(img2, x + offset_2_x, y + offset_2_y), img2->format, &r, &g, &b);
+				if (r != 0xFF || g != 0 || b != 0xFF) {
+					if (SDL_MUSTLOCK(img2)) SDL_UnlockSurface(img2);
+					if (SDL_MUSTLOCK(img1)) SDL_UnlockSurface(img1);
+					return 1;
+				}
+			}
+		}
+	}
+
+	if (SDL_MUSTLOCK(img2)) SDL_UnlockSurface(img2);
+	if (SDL_MUSTLOCK(img1)) SDL_UnlockSurface(img1);
+	return 0;
 }
 
 /* ************************************************************** */
 // MAIN GAME LOOP
-int state_game(struct env_t* env, Mix_Music* music_pause, const int level, int* score)
+int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int * score)
 {
-	int i;
-	FILE* fp;
-
-	// enemy point values
-	const long scores[256] =
-	{0, 100, 50, 100, 250, 50, 500, 0, 500, 100,
-		50, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 100000, 100000, 100000, 10, 10, 10, 0, 10000,
-		50000, 30000, 40000, 20000, 100000, 100000};
-
+	int i, j;
 	/* ************************************************************** */
 	// NON-PRELOADED Resources
-	struct spawninfo slist[ALLSPAWN];
-	SDL_Surface* strips[42] = {NULL};
-	int stripslist[128] = {0};
+	SDL_Surface * strips[MAXSTRIPS] = {NULL};
 
 	/* LOAD DATA FILES FOR LEVEL */
 	char buffer[30];
+	unsigned char stripslist[LVLSIZE] = { 0 };
+	struct spawninfo slist[ALLSPAWN] = { { 0 } };
+	sprintf(buffer, "data/%d.lvl", level);
+	FILE * fp = fopen(buffer, "r");
+	fscanf(fp, "%d\n", &j);
 
-	sprintf(buffer, "data/%d.map", level);
-	fp = fopen(buffer, "rb");
-	for(i = 0;i<128;i++)
-		fread(&stripslist[i], 1, 1, fp);
+	for (i = 0; i < j; i++)
+		fscanf(fp, "%hhu\n", &stripslist[i]);
+
+	fscanf(fp, "%d\n", &j);
+
+	for (i = 0; i < j; i++)
+		fscanf(fp, "%hhu %hhu %hu %hu %hd %hd\n", &slist[i].when, &slist[i].type, &slist[i].x, &slist[i].y, &slist[i].arg1, &slist[i].arg2);
+
 	fclose(fp);
 
-	sprintf(buffer, "data/%d.ens", level);
-	fp = fopen(buffer, "r");
-	for(i = 0;i<ALLSPAWN;i++)
-		if (!feof(fp))
-			fscanf(fp, "%d %f %f %d %f %f %d\n", &slist[i].when, &slist[i].x, &slist[i].y, &slist[i].type, &slist[i].arg1, &slist[i].arg2, &slist[i].life);
-		else
-			slist[i].when = 999;
-	fclose(fp);
+	Mix_Music * music = NULL;
 
-	Mix_Music* music = NULL;
-	if (env->mus_works && env->mus_on)
-	{
+	if (env->mus_works && env->mus_on) {
 		sprintf(buffer, "audio/%d.mod", level);
 		music = load_music(buffer, 1);
 	}
 
-	if (level<6) {
-		for (i = 1;i<42;i++)
+	// load strips - any used in the map (and don't double-load)
+	for (i = 0; i < LVLSIZE; i++)
+	{
+		if (stripslist[i] && ! strips[stripslist[i]])
 		{
-			sprintf(buffer, "img/strips/%d/%d.png", level, i);
-			strips[i] = load_image(buffer, 1);
+			sprintf(buffer, "img/strips/%d/%d.png", level, stripslist[i]);
+			strips[stripslist[i]] = load_image(buffer, 3);
 		}
 	}
 
 	/* setup rectangles */
-	SDL_Rect striprect;
-	striprect.x = 0;
-	striprect.w = 800;
-	striprect.h = 128;
-
-	SDL_Rect bgrect;
-	bgrect.x = 0;
-	bgrect.w = 800;
-	bgrect.h = 600;
-
-	SDL_Rect shiprect;
-	shiprect.w = 32;
-	shiprect.h = 32;
-
-	SDL_Rect bulletrect;
-	bulletrect.w = 16;
-	bulletrect.h = 16;
-
-	SDL_Rect indicrect;
-	indicrect.x = 16;
-	indicrect.y = 568;
-	indicrect.w = 0;
-	indicrect.h = 16;
-
-	SDL_Rect pauserect;
-	pauserect.x = 258;
-	pauserect.y = 280;
-	pauserect.w = 284;
-	pauserect.h = 40;
-
-	SDL_Rect erect;
+	SDL_Rect striprect = { .x = 0, .w = 800, .h = 128 };
+	SDL_Rect bgrect = { .x = 0, .w = 800, .h = 600 };
+	SDL_Rect shiprect = { .w = 64, .h = 64 };
+	SDL_Rect bulletrect = { .h = 8 };
+	SDL_Rect indicrect = { .x = 16, .y = 568, .w = 0, .h = 16 };
+	SDL_Rect pauserect = { .x = 258, .y = 280, .w = 284, .h = 40 };
 
 	/* other stuff */
 	const Uint32 color_blue = SDL_MapRGB(env->screen->format, 0, 0, 255);
 
-	for(i = 0;i<SCREENE;i++)
+	for (i = 0; i < SCREENE; i++)
 		elist[i].type = 0;
-	for(i = 0;i<SCREENBUL;i++)
-		bullets[i].type = 0;
-	for(i = 0;i<SCREENEX;i++)
-		explo[i].type = 0;
 
+	for (i = 0; i < SCREENBUL; i++)
+		bullets[i].type = 0;
+
+	for (i = 0; i < SCREENEX; i++)
+		explo[i].type = 0;
 
 	/* ************************************************************** */
 	// GAMEPLAY VARIABLES
+	// which strip we are on
 	int stripindex = 0;
+	// Index into spawn array
+	int spawnidx = 0;
+	// positions of various rectangles
+	float bgpos = 0;
+	float strippos = 432;
+	float overlaypos = 0;
 
-	float strippos = -168;
-	float bgpos = -600;
-	float overlaypos = -600;
-	long tickslastupdate = 0;
-	int bossloop = 0;
-
-	float invuln = 0;
-	float bosstimer = 0;
-
-	int spawnpos = 0;
-	int glevel = 1;
-	int lives;
-
-	float shipx;
-	float shipy;
-	int shipimg;
-	float cooldown = 0.0f;
-	float urate, oldrate = 1;
-	float rate = 1;
+	// Player positions, lives, info etc
+	int lives = 5;
+	int shipimg = 1;
+	float shipx = 400 - img_player[shipimg]->w / 2;
+	float shipy = 500 - img_player[shipimg]->h / 2;
+	int cooldown = 0;
+	// Time left on player invuln (0 if vuln)
+	int invuln = 0;
+	// amount of time buildup
 	float speedbar = 0;
-	float qboss;
+
+	// game speed (0=slow 1=normal 2=fast)
+	int rate = 1;
+
+	// is game paused?
 	int gpause = 0;
 
-//	int rate = 2;
+	// Final Boss needs extra tick counters for attacks.
+	int boss_timer = 0;
+
 	unsigned char keysdown[7] = {0};
 	unsigned char joystate[7] = {0};
-
-	glevel = level;
-	gpause = 0;
-	bosstimer = 0;
-	bossloop = 0;
-
-	strippos = -168;
-	stripindex = 0;
-	bgpos = -600;
-	invuln = 0;
-	spawnpos = 0;
-	lives = 5;
-	shipx = 400;
-	shipy = 500;
-	shipimg = 1;
-	cooldown = 0.0f;
-	rate = 1;
-	speedbar = 0;
-
-	for (i = 0;i<7;i++)
-		keysdown[i] = 0;
-
-	tickslastupdate = SDL_GetTicks();
-
+	// SDL_Ticks since last update
+	unsigned long tickslastupdate = SDL_GetTicks();
+	/* Event loop */
 	int state = STATE_GAME;
-	do
-	{
+
+	do {
 		/* handle input */
 		SDL_Event event;
+		while (SDL_PollEvent(&event)) {
+			switch (event.type) {
+			case SDL_ACTIVEEVENT:
 
-		/* Check for events */
-		while (SDL_PollEvent (&event))
-		{
-			switch (event.type)
-			{
-				case SDL_ACTIVEEVENT:
-					if ( ( ( event.active.state & SDL_APPACTIVE ) || ( event.active.state & SDL_APPINPUTFOCUS ) ) &&
-						event.active.gain == 0) {
-						gpause = 1;
+				// if the game loses focus, pause it
+				if (((event.active.state & SDL_APPACTIVE) || (event.active.state & SDL_APPINPUTFOCUS)) &&
+					event.active.gain == 0 && !gpause)
+				{
+					if (env->mus_on == 1) {
+						Mix_PlayMusic(music_pause, -1);
 					}
-					break;
-				case SDL_KEYDOWN:
-					if (event.key.keysym.sym == env->KEY_UP)
-						keysdown[0] = 1;
-					else if (event.key.keysym.sym == env->KEY_DOWN)
-						keysdown[1] = 1;
-					else if (event.key.keysym.sym == env->KEY_LEFT)
-						keysdown[2] = 1;
-					else if (event.key.keysym.sym == env->KEY_RIGHT)
-						keysdown[3] = 1;
-					else if (event.key.keysym.sym == env->KEY_FIRE)
-						keysdown[4] = 1;
-					else if (event.key.keysym.sym == env->KEY_SPEED_DOWN)
-						keysdown[5] = 1;
-					else if (event.key.keysym.sym == env->KEY_SPEED_UP)
-						keysdown[6] = 1;
-					break;
+					gpause = 1;
+				}
 
-				case SDL_KEYUP:
-					if (event.key.keysym.sym == env->KEY_UP)
-						keysdown[0] = 0;
-					else if (event.key.keysym.sym == env->KEY_DOWN)
-						keysdown[1] = 0;
-					else if (event.key.keysym.sym == env->KEY_LEFT)
-						keysdown[2] = 0;
-					else if (event.key.keysym.sym == env->KEY_RIGHT)
-						keysdown[3] = 0;
-					else if (event.key.keysym.sym == env->KEY_FIRE)
-						keysdown[4] = 0;
-					else if (event.key.keysym.sym == env->KEY_SPEED_DOWN)
-						keysdown[5] = 0;
-					else if (event.key.keysym.sym == env->KEY_SPEED_UP)
-						keysdown[6] = 0;
+				break;
 
-					else if (event.key.keysym.sym == env->KEY_QUIT)
-						state = STATE_UI;
+			case SDL_KEYDOWN:
+				if (event.key.keysym.sym == env->KEY_UP)
+					keysdown[0] = 1;
+				else if (event.key.keysym.sym == env->KEY_DOWN)
+					keysdown[1] = 1;
+				else if (event.key.keysym.sym == env->KEY_LEFT)
+					keysdown[2] = 1;
+				else if (event.key.keysym.sym == env->KEY_RIGHT)
+					keysdown[3] = 1;
+				else if (event.key.keysym.sym == env->KEY_FIRE)
+					keysdown[4] = 1;
+				else if (event.key.keysym.sym == env->KEY_SPEED_DOWN)
+					keysdown[5] = 1;
+				else if (event.key.keysym.sym == env->KEY_SPEED_UP)
+					keysdown[6] = 1;
 
-					else if (event.key.keysym.sym == env->KEY_PAUSE)
-					{
-						if (gpause == 0) {
-							if (env->mus_on == 1) {
-								Mix_HaltMusic();
-								Mix_PlayMusic(music_pause, -1);
-							}
-							gpause = 1;
-						} else {
-							if (env->mus_on == 1) {
-								Mix_HaltMusic();
-								Mix_PlayMusic(music, -1);
-							}
-							gpause = 0;
+				break;
+
+			case SDL_KEYUP:
+				if (event.key.keysym.sym == env->KEY_UP)
+					keysdown[0] = 0;
+				else if (event.key.keysym.sym == env->KEY_DOWN)
+					keysdown[1] = 0;
+				else if (event.key.keysym.sym == env->KEY_LEFT)
+					keysdown[2] = 0;
+				else if (event.key.keysym.sym == env->KEY_RIGHT)
+					keysdown[3] = 0;
+				else if (event.key.keysym.sym == env->KEY_FIRE)
+					keysdown[4] = 0;
+				else if (event.key.keysym.sym == env->KEY_SPEED_DOWN)
+					keysdown[5] = 0;
+				else if (event.key.keysym.sym == env->KEY_SPEED_UP)
+					keysdown[6] = 0;
+				else if (event.key.keysym.sym == env->KEY_QUIT)
+					state = STATE_UI;
+				else if (event.key.keysym.sym == env->KEY_PAUSE) {
+					if (gpause == 0) {
+						if (env->mus_on == 1) {
+							Mix_PlayMusic(music_pause, -1);
 						}
+
+						gpause = 1;
+					} else {
+						if (env->mus_on == 1) {
+							Mix_PlayMusic(music, -1);
+						}
+
+						gpause = 0;
 					}
-					break;
-				case SDL_QUIT:
-					state = STATE_QUIT;
+				} else if (env->debug) {
+					if (event.key.keysym.sym == SDLK_F2)
+						lives ++;
+					else if (event.key.keysym.sym == SDLK_F3)
+						state = STATE_VICTORY;
+				}
+
+				break;
+
+			case SDL_QUIT:
+				state = STATE_QUIT;
 			}
 		}
 
-			/* here we use the joystick to fake keypresses : ) */
-/*			if (joysticks>0)
-			{
-				axis = SDL_JoystickGetAxis(joy, 0);
-				if (axis < -10923) {
-					joystate[2] = 1;
-					joystate[3] = 0;
-				} else if (axis > 10923) {
-					joystate[2] = 0;
-					joystate[3] = 1;
-				} else {
-					joystate[2] = 0;
-					joystate[3] = 0;
-				}
-
-				axis = SDL_JoystickGetAxis(joy, 1);
-				if (axis < -10923) {
-					joystate[0] = 0;
-					joystate[1] = 1;
-				} else if (axis > 10923) {
-					joystate[0] = 1;
-					joystate[1] = 0;
-				} else {
-					joystate[0] = 0;
-					joystate[1] = 0;
-				}
-
-				button = SDL_JoystickGetButton(joy, 0);
-				if (button) joystate[6] = 1; else joystate[6] = 0;
-				button = SDL_JoystickGetButton(joy, 1);
-				if (button) joystate[4] = 1; else joystate[4] = 0;
-				button = SDL_JoystickGetButton(joy, 2);
-				if (button) joystate[5] = 1; else joystate[5] = 0;
-			}
-		}*/
-
-		/* update */
-		{
-			int i, j;
-			float tempticks;
-
-			tempticks = (float)SDL_GetTicks();
-
-			urate = rate * (tempticks-(float)tickslastupdate)/16.666667f;
-			tickslastupdate = (long)tempticks;
-
-			if (!gpause) {
-
-				if (cooldown>0.0f) cooldown -= urate;
-				if (keysdown[0] != 0 || joystate[0] != 0)
-					shipy = shipy-(urate*SCROLLSPEED / rate);
-				else if (keysdown[1] != 0 || joystate[1] != 0)
-					shipy = shipy+(urate * SCROLLSPEED / rate);
-				if (keysdown[2] != 0 || joystate[2] != 0)
-				{
-					shipx = shipx-(urate * SCROLLSPEED / rate);
-					shipimg = 0; }
-				else if (keysdown[3] != 0 || joystate[3] != 0)
-				{
-					shipx = shipx+(urate * SCROLLSPEED / rate);
-					shipimg = 2;
-				} else shipimg = 1;
-
-				if (( joystate[4] != 0 || keysdown[4] != 0) && cooldown <= 0.0f)
-				{
-					createbullet(shipx-32, shipy-16, 1, 90, 7.5);
-					createbullet(shipx+32, shipy-16, 1, 90, 7.5);
-					cooldown = 8;
-					playnoise(P_SHOT, rate, shipx);
-				}
-
-				if ((keysdown[5] != 0 || joystate[5] != 0) && speedbar>0)
-				{
-					rate = 0.5;
-				}else if (keysdown[6] != 0 || joystate[6] != 0 )
-				{
-					rate = 2;
-				}else {
-					rate = 1;
-				}
-
-				if (rate<oldrate) playnoise(S_DOWN, 1, 400);
-				if (rate>oldrate) playnoise(S_UP, 1, 400);
-				oldrate = rate;
-
-				if (shipx<0) shipx = 0;
-				if (shipx>800) shipx = 800;
-				if (shipy<0) shipy = 0;
-				if (shipy>600) shipy = 600;
-
-				if (rate == 2) speedbar += urate*4;
-				if (rate == 0.5) speedbar -= urate*16;
-
-				if (speedbar>768) speedbar = 768;
-				if (speedbar<0) speedbar = 0;
-
-				for (i = 0;i<SCREENEX;i++)
-				{
-					if (explo[i].type != 0)
+		/* here we use the joystick to fake keypresses : ) */
+		/*			if (joysticks>0)
 					{
-						explo[i].img += urate;
-						explo[i].y += (urate * SCROLLSPEED);
-						if (explo[i].img >= 5*EXPLOSPEED) {
-							if (explo[i].type == 3) {
-								state = STATE_VICTORY;
-							} else if (explo[i].type == 1 && lives <= 0) { state = STATE_GAMEOVER;
-							} else {explo[i].type = 0;}
+						axis = SDL_JoystickGetAxis(joy, 0);
+						if (axis < -10923) {
+							joystate[2] = 1;
+							joystate[3] = 0;
+						} else if (axis > 10923) {
+							joystate[2] = 0;
+							joystate[3] = 1;
+						} else {
+							joystate[2] = 0;
+							joystate[3] = 0;
+						}
+
+						axis = SDL_JoystickGetAxis(joy, 1);
+						if (axis < -10923) {
+							joystate[0] = 0;
+							joystate[1] = 1;
+						} else if (axis > 10923) {
+							joystate[0] = 1;
+							joystate[1] = 0;
+						} else {
+							joystate[0] = 0;
+							joystate[1] = 0;
+						}
+
+						button = SDL_JoystickGetButton(joy, 0);
+						if (button) joystate[6] = 1; else joystate[6] = 0;
+						button = SDL_JoystickGetButton(joy, 1);
+						if (button) joystate[4] = 1; else joystate[4] = 0;
+						button = SDL_JoystickGetButton(joy, 2);
+						if (button) joystate[5] = 1; else joystate[5] = 0;
+					}
+				}*/
+		/* update time step */
+		unsigned long tempticks = SDL_GetTicks();
+		// calculate the number of ticks between before and now
+		unsigned long t_diff = tempticks - tickslastupdate;
+		tickslastupdate = tempticks;
+
+		// only do game processing and draw if ticks have passed
+		if (t_diff) {
+			// game unpaused so make everything happen
+			if (!gpause) {
+				// lots of movements are driven by scaled rate
+				int urate = (1 << rate) * t_diff;
+
+				// ship movement
+				if (keysdown[0] != 0 || joystate[0] != 0) {
+					shipy -= (t_diff * SHIPSPEED);
+
+					if (shipy < 0) shipy = 0;
+				} else if (keysdown[1] != 0 || joystate[1] != 0) {
+					shipy += (t_diff * SHIPSPEED);
+
+					if (shipy >= 600 - img_player[shipimg]->h) shipy = nextafterf(600 - img_player[shipimg]->h, 0);
+				}
+
+				if (keysdown[2] != 0 || joystate[2] != 0) {
+					shipimg = 0;
+					shipx -= (t_diff * SHIPSPEED);
+
+					if (shipx < 0) shipx = 0;
+				} else if (keysdown[3] != 0 || joystate[3] != 0) {
+					shipimg = 2;
+					shipx += (t_diff * SHIPSPEED);
+
+					if (shipx >= 800 - img_player[shipimg]->w) shipx = nextafterf(800 - img_player[shipimg]->w, 0);
+				}
+				else shipimg = 1;
+
+				// firing a bullet
+				if (cooldown > 0) cooldown -= urate;
+
+				if ((joystate[4] != 0 || keysdown[4] != 0) && cooldown <= 0) {
+					createbullet(1, 64, shipx, shipy + img_player[shipimg]->h / 2, 4);
+					createbullet(1, 64, shipx + img_player[shipimg]->w, shipy + img_player[shipimg]->h / 2, 4);
+					cooldown = 500;
+					playnoise(P_SHOT, rate, shipx + img_player[shipimg]->w / 2);
+				}
+
+				// handle speed changes
+				int prev_rate = rate;
+				if ((keysdown[5] != 0 || joystate[5] != 0) && (env->debug || speedbar > 0)) {
+					rate = 0;
+					speedbar -= t_diff * BARSPEED;
+
+					if (speedbar < 0) speedbar = 0;
+				} else if (keysdown[6] != 0 || joystate[6] != 0) {
+					rate = 2;
+					speedbar += t_diff * BARSPEED;
+
+					if (speedbar >= 769) speedbar = nextafterf(769, 0);
+				} else
+					rate = 1;
+
+				if (rate < prev_rate) playnoise(S_DOWN, 1, 400);
+				else if (rate > prev_rate) playnoise(S_UP, 1, 400);
+
+				// player invulnerability timer
+				if (invuln > 0) {
+					invuln -= t_diff;
+					if (invuln < 0) invuln = 0;
+					else shipimg = 3;
+				}
+
+				// update scrolling background images etc
+				//  background starfield
+				bgpos = fmodf(bgpos + urate * SCROLLSPEED, 600);
+
+				// strip updates
+				//  this requires more work to create enemies etc
+				strippos += 2 * urate * SCROLLSPEED;
+
+				while (strippos >= 600) {
+					strippos -= 128;
+
+					if (stripindex < LVLSIZE - 6) {
+						stripindex++;
+
+						while (slist[spawnidx].when && slist[spawnidx].when <= stripindex) {
+							createenemy(slist[spawnidx].type, slist[spawnidx].x, slist[spawnidx].y, slist[spawnidx].arg1, slist[spawnidx].arg2);
+
+							// if an end-level boss spawned, play the boss music
+							if (slist[spawnidx].type > 16) {
+								Mix_HaltMusic();
+
+								if (music_boss != NULL) Mix_PlayMusic(music_boss, -1);
+							}
+
+							spawnidx++;
 						}
 					}
 				}
 
-				for (i = 0;i<SCREENBUL;i++)
-				{
-					if (bullets[i].type != 0)
-					{
-						bullets[i].x = bullets[i].x+(urate * (bullets[i].speed*sintbl[(bullets[i].theta+90) % 360]));
-						bullets[i].y = bullets[i].y-(urate * (bullets[i].speed*sintbl[bullets[i].theta]));
-						if (bullets[i].type == 1)
-						{
-							for (j = 0;j<SCREENE; j++)
-							{
-								if (elist[j].type != 0)
-								{
-									if ((elist[j].x-(img_enemy[elist[j].type-1]->w/2)<bullets[i].x) && (elist[j].x+(img_enemy[elist[j].type-1]->w/2)>bullets[i].x) && (elist[j].y-(img_enemy[elist[j].type-1]->h/2)<bullets[i].y) && (elist[j].y+(img_enemy[elist[j].type-1]->h/2)>bullets[i].y))
-									{
+				// speed lines overlay
+				overlaypos = fmodf(overlaypos + 4 * urate * SCROLLSPEED, 600);
+
+				/* EXPLOSIONS */
+				for (i = 0; i < SCREENEX; i++) {
+					if (explo[i].type != 0) {
+						explo[i].y += (urate * SCROLLSPEED);
+
+						explo[i].timer += (urate * EXPLOSPEED);
+						if (explo[i].timer >= 5) {
+							// bit of a hack, but: if this was the Boss Explosion, it's victory
+							//  and if it was the Player Explosion, game over!
+							if (explo[i].type == 3)
+								state = STATE_VICTORY;
+
+							else if (explo[i].type == 1 && lives <= 0)
+								state = STATE_GAMEOVER;
+
+							else
+								explo[i].type = 0;
+						}
+					}
+				}
+
+				/* BULLETS */
+				for (i = 0; i < SCREENBUL; i++) {
+					if (bullets[i].type != 0) {
+						bullets[i].x += urate * SCROLLSPEED * bullets[i].dx;
+						bullets[i].y += urate * SCROLLSPEED * bullets[i].dy;
+
+						// bullet flies off screen
+						int x = bullets[i].x;
+						int y = bullets[i].y;
+						if (y <= -img_shot[bullets[i].type - 1]->h || y >= 600 ||
+							x <= -img_shot[bullets[i].type - 1]->w || x >= 800)
+							bullets[i].type = 0;
+						else if (bullets[i].type == 1) {
+							// player bullet - check for collision against an enemy
+							for (j = 0; j < SCREENE; j++) {
+								if (elist[j].type != 0) {
+									if (check_pixel_collision(x, y, elist[j].x, elist[j].y,
+										img_shot[0], img_enemy[elist[j].type - 1])) {
 										bullets[i].type = 0;
 										elist[j].life--;
+										break;
 									}
 								}
 							}
-						}else if (invuln <= 0) {
-							if ((shipx-32<bullets[i].x) && (shipx+32>bullets[i].x) && (shipy-32<bullets[i].y) && (shipy+32>bullets[i].y))
+						}
+						else if (!invuln) {
+							// enemy bullet - if player is not invuln. then check if a bullet hit them
+							if (check_pixel_collision(x, y, shipx, shipy,
+								img_shot[bullets[i].type - 1], img_player[shipimg]))
 							{
 								bullets[i].type = 0;
-								invuln = 100;
-								createexplosion(shipx, shipy, 1);
-								playnoise(P_DIE, rate, shipx);
+								invuln = 5000;
+								int ctr_x = shipx + img_player[shipimg]->w / 2;
+								createexplosion(1, ctr_x, shipy + img_player[shipimg]->h / 2);
+								playnoise(P_DIE, rate, ctr_x);
 								lives--;
 							}
 						}
-						if (bullets[i].y<0 || bullets[i].y>600 || bullets[i].x<0 || bullets[i].x>800) bullets[i].type = 0;
 					}
 				}
 
-				for (i = 0;i<SCREENE;i++)
-				{
-					if (elist[i].type != 0)
-					{
+				/* ENEMY UPDATES AND AI BEHAVIOR */
+				for (i = 0; i < SCREENE; i++) {
+					if (elist[i].type != 0) {
 						switch (elist[i].type) {
-							case 1:                      // stationary turret
-								elist[i].arg1 += urate;
-								if (elist[i].arg1>10)
+						case 1:                      // stationary turret
+							elist[i].y += SCROLLSPEED * 2 * urate;
+							elist[i].timer += urate;
+
+							if (elist[i].timer >= 1000) {
+								elist[i].timer -= 1000;
+								float ctr_x = elist[i].x + img_enemy[0]->w / 2;
+								createbullet(2, 192, ctr_x, elist[i].y + img_enemy[0]->h, 2.5);
+								playnoise(E_SHOT, rate, ctr_x);
+							}
+
+							break;
+
+						case 2:                     // spinning shooting thing
+							elist[i].y += SCROLLSPEED * urate;
+							elist[i].timer += urate;
+
+							if (elist[i].timer >= 250) {
+								elist[i].timer -= 250;
+
+								float ctr_x = elist[i].x + img_enemy[1]->w / 2;
+								createbullet(3, elist[i].arg1, ctr_x, elist[i].y + img_enemy[1]->h / 2, 3);
+								playnoise(E_SHOT, rate, ctr_x);
+								// advance angle by increment
+								// keep angle within limits
+								elist[i].arg1 = (elist[i].arg1 + elist[i].arg2) & 0xFF;
+							}
+
+							break;
+
+						case 3:							// single homing rocket launcher
+							//							elist[i].y += SCROLLSPEED * urate;
+							elist[i].x += SCROLLSPEED * 4 * urate * elist[i].arg2;
+
+							if (!elist[i].timer &&
+								((elist[i].x > elist[i].arg1 && elist[i].arg2 > 0) ||
+								(elist[i].x < elist[i].arg1 && elist[i].arg2 < 0))) {
+								elist[i].timer = 1;
+
+								float ctr_x = elist[i].x + img_enemy[2]->w / 2;
+
+								createenemy(12, ctr_x - img_enemy[12]->w / 2, elist[i].y + img_enemy[2]->h, 1, 192);
+								playnoise(E_SHOT, rate, ctr_x);
+							}
+
+							break;
+
+						case 4:                          // charger
+							elist[i].y += SCROLLSPEED * 3 * urate;
+							elist[i].timer += urate;
+							if (elist[i].timer >= 175) {
+								elist[i].timer -= 175;
+								switch (elist[i].arg2)
 								{
-									createbullet(elist[i].x, elist[i].y+16, 2, 270, 5.0);
-									playnoise(E_SHOT, rate, elist[i].x);
-									elist[i].arg1 = 0;
+								case 2:
+									j = 190;
+									break;
+								case 1:
+								case 3:
+									j = 191;
+									break;
+								case 0:
+								case 4:
+									j = 192;
+									break;
+								case 5:
+								case 7:
+									j = 193;
+									break;
+								case 6:
+									j = 194;
+									break;
 								}
-								elist[i].y += SCROLLSPEED*urate;
-								break;
-							case 2:                     // shrapnel mine
-								elist[i].arg1 += urate;
-								if (elist[i].arg1>5)
+								elist[i].arg2 = (elist[i].arg2 + 1) % 8;
+								float ctr_x = elist[i].x + img_enemy[3]->w / 2;
+								createbullet(2, j, ctr_x, elist[i].y + img_enemy[3]->h, 5);
+								playnoise(E_SHOT, rate, ctr_x);
+							}
+
+							break;
+
+						case 5:                          // depth charge
+							elist[i].y += SCROLLSPEED * urate;
+
+							if (elist[i].y >= elist[i].arg1) {
+								int ctr_x = elist[i].x + img_enemy[4]->w / 2;
+								int ctr_y = elist[i].y + img_enemy[4]->h / 2;
+								for (j = 0; j < 256; j += 32)
+									createbullet(5, j, ctr_x, ctr_y, 5);
+
+								// rather than set life to 0 (because that would give the player points...)
+								createexplosion(4, ctr_x, ctr_y);
+								playnoise(E_DIE, rate, ctr_x);
+								elist[i].type = 0;
+							}
+
+							break;
+						case 6:                          //side-shooting upwards rocketguy
+							elist[i].y -= SCROLLSPEED * urate;
+
+							elist[i].timer += urate;
+							if (elist[i].timer>=100)
+							{
+								elist[i].timer -= 100;
+								if (elist[i].arg1 < 20)
 								{
-									createbullet(elist[i].x, elist[i].y, 3, elist[i].arg2, 5.0);
-									playnoise(E_SHOT, rate, elist[i].x);
-									elist[i].arg2 += 15;
-									if (elist[i].arg2>359) elist[i].arg2 = 0;
-									elist[i].arg1 = 0;
+									for (j = 36; j < 89; j += 26) {
+										createbullet(4, 128, elist[i].x, j + elist[i].y, 5);
+										createbullet(4, 0, elist[i].x + img_enemy[5]->w, j + elist[i].y, 5);
+									}
+									playnoise(E_SHOT, rate, elist[i].x + img_enemy[5]->w / 2);
 								}
-								elist[i].y += SCROLLSPEED*urate;
-								break;
-							case 3:                      // single homer
-								elist[i].x += SCROLLSPEED*2*urate*elist[i].arg2;
-								if (elist[i].arg3 == 0 && ((elist[i].x>elist[i].arg1 && elist[i].arg2>0) || (elist[i].x<elist[i].arg1 && elist[i].arg2<0)))
+								elist[i].arg1 = (elist[i].arg1 + 1) % 50;
+							}
+							break;
+						case 7:                          //brick!
+							elist[i].y += SCROLLSPEED * 2 * urate;
+							break;
+						case 8:                          //carrier: launches fighters
+							if (elist[i].y < 0) {
+								elist[i].y += SCROLLSPEED * urate;
+								if (elist[i].y > 0)
+									elist[i].y = 0;
+							}
+							else {
+								elist[i].timer += urate;
+								if (elist[i].timer >= 5000)
 								{
-									createenemy(elist[i].x, elist[i].y, 246, 0, 270, 1);
-									playnoise(E_SHOT, rate, elist[i].x);
-									elist[i].arg3 = 1;
+									elist[i].timer -= 5000;
+									createenemy(9, elist[i].x + (img_enemy[7]->w - img_enemy[8]->w) / 2, elist[i].y, 0, 0);
+									playnoise(E_SHOT, rate, elist[i].x + img_enemy[7]->w / 2);
 								}
-								elist[i].y += SCROLLSPEED*urate;
-								break;
-							case 4:                          // charger
-								elist[i].arg1 += urate;
-								if (elist[i].arg1>5)
+							}
+							break;
+						case 9:                         //carrier fighter!
+							elist[i].y += SCROLLSPEED * urate;
+							if (elist[i].y >= 128) {
+								elist[i].y += SCROLLSPEED * urate;
+								if (elist[i].x < shipx) elist[i].x += SCROLLSPEED * urate;
+								if (elist[i].x > shipx) elist[i].x -= SCROLLSPEED * urate;
+
+								elist[i].timer += urate;
+								if (elist[i].timer >= 350)
 								{
-									createbullet(elist[i].x, elist[i].y+16, 2, 265+(rand()%10), 10.0);
-									playnoise(E_SHOT, rate, elist[i].x);
-									elist[i].arg1 = 0;
+									elist[i].timer -= 350;
+									createbullet(5, 192, elist[i].x, elist[i].y + img_enemy[8]->h, 3);
+									createbullet(5, 192, elist[i].x + img_enemy[8]->w, elist[i].y + img_enemy[8]->h, 3);
+									playnoise(E_SHOT, rate, elist[i].x + img_enemy[8]->w / 2);
 								}
-								elist[i].y += SCROLLSPEED*1.5*urate;
-								break;
-							case 5:                          // depth charge
-								elist[i].arg1 += urate;
-								if (elist[i].arg1>elist[i].arg2)
+							}
+							break;
+						case 10:                         //uberbomb.
+							elist[i].y += urate*SCROLLSPEED;
+							if (elist[i].y + img_enemy[9]->h / 2 >= 300)
+							{
+								speedbar = 0;
+								createexplosion(5, 400, 300);
+								playnoise(B_DIE, rate, 400);
+								elist[i].type = 0;
+							}
+							break;
+						case 11:
+						case 12:
+						case 13:              // homing rocket
+							// movement
+							elist[i].x += SCROLLSPEED * .125 * urate * elist[i].arg1 * cos(M_PI / 128.0 * elist[i].arg2);
+							elist[i].y -= SCROLLSPEED * .125 * urate * elist[i].arg1 * sin(M_PI / 128.0 * elist[i].arg2);
+
+							// angle adjustments every 200 msec
+							elist[i].timer += urate;
+							if (elist[i].timer > 200)
+							{
+								elist[i].timer -= 200;
+
+								// speed increase
+								elist[i].arg1++;
+
+								// rotate missile at player
+								j = 128.0 / M_PI * atan2(
+									(elist[i].y + img_enemy[11]->h / 2) - (shipy + img_player[shipimg]->h / 2),
+									(shipx + img_player[shipimg]->w / 2) - (elist[i].x + img_enemy[11]->w / 2));
+								if (j > 0) j = -j;
+
+								elist[i].arg2 = j & 0xFF;
+
+								if (elist[i].arg2 < 160) elist[i].arg2 = 160;
+								if (elist[i].arg2 > 224) elist[i].arg2 = 224;
+
+								// fix graphic
+								if (elist[i].arg2 < 177) elist[i].type = 11;
+								else if (elist[i].arg2 > 207) elist[i].type = 13;
+								else elist[i].type = 12;
+							}
+
+							break;
+
+						case 14:                // laser boss helper
+							elist[i].arg1 -= urate;
+							if (elist[i].arg1 <= 0)
+								elist[i].type = 0;
+							else
+							{
+								elist[i].timer += urate;
+								if (elist[i].timer >= 50)
 								{
-									createbullet(elist[i].x, elist[i].y+16, 5, 0, 10.0);
-									createbullet(elist[i].x, elist[i].y+16, 5, 45, 10.0);
-									createbullet(elist[i].x, elist[i].y+16, 5, 90, 10.0);
-									createbullet(elist[i].x, elist[i].y+16, 5, 135, 10.0);
-									createbullet(elist[i].x, elist[i].y+16, 5, 180, 10.0);
-									createbullet(elist[i].x, elist[i].y+16, 5, 225, 10.0);
-									createbullet(elist[i].x, elist[i].y+16, 5, 270, 10.0);
-									createbullet(elist[i].x, elist[i].y+16, 5, 315, 10.0);
-									playnoise(E_SHOT, rate, elist[i].x);
-									createexplosion(elist[i].x, elist[i].y, 4);
-									elist[i].type = 0;
-									elist[i].arg1 = 0;
+									elist[i].timer -= 50;
+									int ctr_x = elist[i].x + img_enemy[13]->w / 2;
+									createbullet(5, elist[i].arg2, ctr_x, elist[i].y + img_enemy[13]->h / 2, 5);
+									playnoise(E_SHOT, rate, ctr_x);
 								}
-								elist[i].y += SCROLLSPEED*urate;
-								break;
-							case 6:                          //side rocket guy
-								elist[i].y -= urate;
-								elist[i].arg1 += urate;
-								if (elist[i].arg1>1)
-								{
-									if (elist[i].arg3 == 1)
-									{
-										elist[i].arg2 -= 1;
-										if (elist[i].arg2 <= 0) { elist[i].arg3 = 0; elist[i].arg2 = 0;}
-									} else {
-										createbullet(elist[i].x, elist[i].y-32, 4, 0, 10.0);
-										createbullet(elist[i].x, elist[i].y-4, 4, 0, 10.0);
-										createbullet(elist[i].x, elist[i].y+22, 4, 0, 10.0);
-										createbullet(elist[i].x, elist[i].y-32, 4, 180, 10.0);
-										createbullet(elist[i].x, elist[i].y-4, 4, 180, 10.0);
-										createbullet(elist[i].x, elist[i].y+22, 4, 180, 10.0);
-										playnoise(E_SHOT, rate, elist[i].x);
-										elist[i].arg2 += 1;
-										if (elist[i].arg2 >= 20) elist[i].arg3 = 1; }
-									elist[i].arg1 = 0;
-								}
-								break;
-							case 7:                          //brick!
-								elist[i].y += SCROLLSPEED*urate;
-								break;
-							case 8:                          //carrier: launches fighters
-								elist[i].arg1 += urate;
-								if (elist[i].arg1>100)
-								{
-									createenemy(elist[i].x, elist[i].y, 9, 0, 0, 2);
-									playnoise(E_SHOT, rate, elist[i].x);
-									elist[i].arg1 = 0;
-								}
-								break;
-							case 9:                         //carrier fighter!
-								elist[i].y += SCROLLSPEED*1.5*urate;
-								if (elist[i].x<shipx) elist[i].x += urate;
-								if (elist[i].x>shipx) elist[i].x -= urate;
-								elist[i].arg1 += urate;
-								if (elist[i].arg1>15)
-								{
-									createbullet(elist[i].x-8, elist[i].y, 5, 270, 10.0);
-									createbullet(elist[i].x+8, elist[i].y, 5, 270, 10.0);
-									playnoise(E_SHOT, rate, elist[i].x);
-									elist[i].arg1 = 0;
-								}
-								break;
-							case 10:                         //uberbomb.
-								elist[i].y += urate*SCROLLSPEED;
-								if (elist[i].y>300)
-								{
-									elist[i].type = 0;
-									createexplosion(400, 300, 5);
-									speedbar = 0;
-								}
-								break;
-							case 242:
-							case 243:
-							case 244:             // space station!
-								elist[i].arg1 += urate;
-								if (elist[i].arg1>7)      //animate
-								{
-									elist[i].type += 1; if (elist[i].type == 245) elist[i].type = 242;
-									elist[i].arg1 = 0;
-								}
-								if (elist[i].y<128) elist[i].y += urate*SCROLLSPEED; else {
-									// do all battle actions here.
-									elist[i].y = 128;
-									if (elist[i].arg3>0)   // taking a shot
-									{
-										if (elist[i].arg3 == 1)  // machine gun!
-										{
-											elist[i].arg3 = 101;
+							}
+							break;
+
+						case 15:
+						case 16:
+						case 17:             // space station!
+							boss_timer += urate;
+							if (boss_timer >= 400)      //animate
+							{
+								boss_timer -= 400;
+								elist[i].type++;
+								if (elist[i].type == 18) elist[i].type = 15;
+							}
+
+							// move onto screen
+							if (elist[i].y < 0) {
+								elist[i].y += SCROLLSPEED * urate;
+								if (elist[i].y > 0)
+									elist[i].y = 0;
+							}
+							else {
+								// do all battle actions here.
+								elist[i].timer += urate;
+								if (elist[i].timer >= 100) {
+									elist[i].timer -= 100;
+
+									// roll over on action frame
+									//  (the first action intentionally skipped via off-by-one)
+									elist[i].arg2++;
+									if (elist[i].arg2 > 74) {
+										elist[i].arg2 -= 75;
+										elist[i].arg1 = (elist[i].arg1 + 1) % 5;
+									}
+
+									// now actually TAKE the action
+									int ctr_x = elist[i].x + img_enemy[15]->w / 2;
+									int ctr_y = elist[i].y + img_enemy[15]->h / 2;
+
+									switch (elist[i].arg1) {
+									case 0:				// time draining bomb
+										if (elist[i].arg2 == 0) {
+											createenemy(10, ctr_x, ctr_y, 0, 0);
+											playnoise(E_SHOT, rate, ctr_x);
 										}
-										if (elist[i].arg3 == 3)
-										{
-											bosstimer += urate;
-											if (bosstimer>5)
-											{
-												for (qboss = 210;qboss <= 330;qboss += 30)
-													createenemy(elist[i].x, elist[i].y, 246, 0, qboss, 1);
-												playnoise(E_SHOT, rate, elist[i].x);
-												bosstimer = 0;
-												elist[i].arg2 += 1; if (elist[i].arg2>4) {elist[i].arg2 = 0; elist[i].arg3 = 0;}
-											}
+										break;
+									case 1:				// machine gun
+										if (elist[i].arg2 % 7 != 0 && elist[i].arg2 < 50) {
+											j = 128.0 / M_PI * atan2(ctr_y - (shipy + img_player[shipimg]->h / 2), (shipx + img_player[shipimg]->w / 2) - ctr_x);
+											j &= 0xFF;
+											createbullet(5, j, ctr_x, ctr_y, 7.5);
+											playnoise(E_SHOT, rate, ctr_x);
 										}
-										if (elist[i].arg3 == 2)
-										{
-											createenemy(elist[i].x, elist[i].y, 10, 0, 0, 1);
-											playnoise(E_SHOT, rate, elist[i].x);
-											elist[i].arg3 = 0;
-											bosstimer = 0;
-											elist[i].arg2 = 0;
+										break;
+									case 2:				// brick walls
+										if (elist[i].arg2 % 50 == 5) {
+											createenemy(7, 0, -32, 0, 0);
+											createenemy(7, 84, -32, 0, 0);
+											createenemy(7, 184, -32, 0, 0);
+											createenemy(7, 584, -32, 0, 0);
+											createenemy(7, 684, -32, 0, 0);
+											createenemy(7, 768, -32, 0, 0);
+											//											playnoise(E_SHOT, rate, ctr_x);
 										}
-										if (elist[i].arg3 == 5)
-										{
-											createenemy(elist[i].x-50, elist[i].y, 2, 0, 0, 5);
-											createenemy(elist[i].x+50, elist[i].y, 2, 0, 180, 5);
-											createenemy(elist[i].x, elist[i].y, 5, 0, 20, 5);
-											playnoise(E_SHOT, rate, elist[i].x);
-											elist[i].arg3 = 0;
-											bosstimer = 0;
-											elist[i].arg2 = 0;
+										break;
+									case 3:				// rocket salvo
+										if (elist[i].arg2 % 20 == 0) {
+											for (j = 0; j <= 4; j++)
+												createenemy(12, ctr_x + (32 * (j - 2)), ctr_y, 1, 160 * 16+j);
+											playnoise(E_SHOT, rate, ctr_x);
 										}
-										if (elist[i].arg3 == 4)
+										break;
+									case 4:				// two spinners
+										if (elist[i].arg2 == 5)
 										{
-											createenemy(0, 0, 7, 0, 0, 100);
-											createenemy(100, 0, 7, 0, 0, 100);
-											createenemy(200, 0, 7, 0, 0, 100);
-											createenemy(600, 0, 7, 0, 0, 100);
-											createenemy(700, 0, 7, 0, 0, 100);
-											createenemy(800, 0, 7, 0, 0, 100);
-											playnoise(E_SHOT, rate, elist[i].x);
-											elist[i].arg3 = 0;
-											bosstimer = 0;
-											elist[i].arg2 = 0;
+											createenemy(2, 184, -32, 0, -13);
+											createenemy(2, 584, -32, 128, 13);
+											createenemy(5, 384, -32, 484, 0);
+//											playnoise(E_SHOT, rate, ctr_x);
 										}
-										if (elist[i].arg3>100)
-										{
-											bosstimer += urate;
-											if (bosstimer>1)
-											{
-												bosstimer = 0;
-												elist[i].arg3 += 1;
-												elist[i].arg2 = 180*atan2((-shipy+elist[i].y), (shipx-elist[i].x))/PI;
-												if (elist[i].arg2<0) elist[i].arg2 += 360;
-												createbullet(elist[i].x, elist[i].y, 5, elist[i].arg2, 10);
-												playnoise(E_SHOT, rate, elist[i].x);
-												elist[i].arg2 = 0;
-												if (elist[i].arg3>200) {elist[i].arg3 = 0; }
-											}
-										}
-									} else {
-										elist[i].arg2 += urate;
-										if (elist[i].arg2>150) { elist[i].arg2 = 0; elist[i].arg3 = bossloop; bossloop += 1; if (bossloop>5) bossloop = 1; }
+										break;
 									}
 								}
+							}
 
-								break;
-							case 245:
-							case 246:
-							case 247:              // homing rocket
-								if (elist[i].arg2<225) elist[i].type = 245;
-								else if (elist[i].arg2>315) elist[i].type = 247;
-								else elist[i].type = 246;
+							break;
+						case 18:                // shotgun boss
+							elist[i].timer += urate;
 
-								elist[i].arg1 += urate;
-								if (elist[i].arg1 > 20)     // can't adjust angle at first
-								{
-									elist[i].arg3 = (180*atan2((-shipy+elist[i].y), (shipx-elist[i].x))/PI);
-									if (elist[i].arg3<0) elist[i].arg3 += 360;
-									elist[i].arg2 += (elist[i].arg2<elist[i].arg3?2*urate:2*(-urate));
-									if (elist[i].arg2>330) elist[i].arg2 = 330;
-									if (elist[i].arg2<210) elist[i].arg2 = 210;
+							if (elist[i].timer >= 4000) {
+								elist[i].timer -= 4000;
+
+								// determine gap in shot
+								int gap;
+								switch (elist[i].arg1) {
+								case 0:
+									gap = 170;
+									break;
+								case 1:
+								case 7:
+									gap = 181;
+									break;
+								case 2:
+								case 6:
+									gap = 192;
+									break;
+								case 3:
+								case 5:
+									gap = 203;
+									break;
+								default:
+									gap = 214;
+									break;
 								}
-								elist[i].x += 10*urate*sintbl[(int)(elist[i].arg2+90) % 360];
-								elist[i].y -= 10*urate*sintbl[(int)elist[i].arg2];
-								break;
-							case 248:                // laser boss helper
-								elist[i].arg1 += urate;
-								if (elist[i].arg1>20)
-									elist[i].type = 0;
-								else
-								{
-									elist[i].arg3 += urate;
-									if (elist[i].arg3>1)
-									{
-										elist[i].arg3 = 0;
-										createbullet(elist[i].x, elist[i].y, 5, elist[i].arg2, 10);
-										playnoise(E_SHOT, rate, elist[i].x);
-									}
-								}
-								break;
-							case 249:                // shotgun boss
-								elist[i].arg1 += urate;
-								if (elist[i].arg1>100)
-								{
-									playnoise(E_SHOT, rate, elist[i].x);
-									if (elist[i].arg3 == 0) elist[i].arg1 = 240;
-									if (elist[i].arg3 == 1 || elist[i].arg3 == 7) elist[i].arg1 = 255;
-									if (elist[i].arg3 == 2 || elist[i].arg3 == 6) elist[i].arg1 = 270;
-									if (elist[i].arg3 == 3 || elist[i].arg3 == 5) elist[i].arg1 = 285;
-									if (elist[i].arg3 == 4) elist[i].arg1 = 300;
-									elist[i].arg3 = elist[i].arg3+1;
-									if (elist[i].arg3 == 8) elist[i].arg3 = 0;
-									for (elist[i].arg2 = 210;elist[i].arg2<elist[i].arg1-5;elist[i].arg2++)
-										createbullet(elist[i].x, elist[i].y, 2, elist[i].arg2, 7.5);
-									for (elist[i].arg2 = elist[i].arg1+5;elist[i].arg2 <= 330;elist[i].arg2++)
-										createbullet(elist[i].x, elist[i].y, 2, elist[i].arg2, 7.5);
-									elist[i].arg1 = 0;
-								}
-								break;
-							case 250:               //shrapnel boss
-								elist[i].arg1 += urate;
-								elist[i].x += elist[i].arg2;
-								if (elist[i].x<128) elist[i].arg2 = 1;
-								if (elist[i].x>672) elist[i].arg2 = -1;
-								if (elist[i].arg1>150)
-								{
-									createenemy(elist[i].x, elist[i].y, 2, 0, 0, 5);
-									playnoise(E_SHOT, rate, elist[i].x);
-									elist[i].arg1 = 0;
-								}
-								break;
-							case 251:               //laser boss
-								elist[i].arg1 += urate;
-								if (elist[i].arg1>20)
-								{
-									elist[i].arg2 = 180*atan2((-shipy+elist[i].y), (shipx-elist[i].x))/PI;
-									if (elist[i].arg2<0) elist[i].arg2 += 360;
-									createenemy(elist[i].x, elist[i].y, 248, 0, elist[i].arg2, 1);
-									elist[i].arg1 = 0;
-								}
-								break;
-							case 252:               //rocket boss
-								elist[i].arg1 += urate;
-								elist[i].x += elist[i].arg2;
-								if (elist[i].x<300) elist[i].arg2 = 1;
-								if (elist[i].x>500) elist[i].arg2 = -1;
-								if (elist[i].arg1>50)
-								{
-									for (elist[i].arg3 = 210;elist[i].arg3 <= 330;elist[i].arg3 += 30)
-										createenemy(elist[i].x, elist[i].y, 246, 0, elist[i].arg3, 1);
-									playnoise(E_SHOT, rate, elist[i].x);
-									elist[i].arg1 = 0;
-								}
-								break;
-							case 253:               //dcboss
-								elist[i].arg1 += urate;
-								elist[i].x += elist[i].arg2;
-								if (elist[i].x<128) elist[i].arg2 = 1;
-								if (elist[i].x>672) elist[i].arg2 = -1;
-								if (elist[i].arg1>100)
-								{
-									createenemy(elist[i].x, elist[i].y, 5, 0, (shipy-elist[i].y)/SCROLLSPEED, 5);
-									playnoise(E_SHOT, rate, elist[i].x);
-									elist[i].arg1 = 0;
-								}
-								break;
-							default:
-								break;
+								// advance state w/ rollover
+								elist[i].arg1 = (elist[i].arg1 + 1) % 8;
+
+								// create bullet spread
+								int ctr_x = elist[i].x + img_enemy[17]->w / 2;
+								for (j = 129; j < gap - 4; j ++)
+									createbullet(2, j, ctr_x, elist[i].y, 4);
+
+								for (j = gap + 4; j <= 255; j++)
+									createbullet(2, j, ctr_x, elist[i].y, 4);
+
+								playnoise(E_SHOT, rate, ctr_x);
+							}
+
+							break;
+						case 19:               //dcboss
+							elist[i].x += urate * SCROLLSPEED * elist[i].arg1;
+
+							if (elist[i].x <= 128) elist[i].arg1 = 1;
+							else if (elist[i].x + img_enemy[18]->w >= 672) elist[i].arg1 = -1;
+
+							elist[i].timer += urate;
+
+							if (elist[i].timer > 5000) {
+								elist[i].timer -= 5000;
+								int ctr_x = elist[i].x + img_enemy[18]->w / 2;
+								createenemy(5, ctr_x - img_enemy[4]->w / 2, elist[i].y + img_enemy[18]->h, shipy + img_player[shipimg]->h / 2 - img_enemy[4]->h / 2, 0);
+								playnoise(E_SHOT, rate, ctr_x);
+							}
+
+							break;
+
+						case 20:               //laser boss
+							elist[i].timer += urate;
+							if (elist[i].timer >= 1000)
+							{
+								elist[i].timer -= 1000;
+								j = 128.0 / M_PI * atan2(
+									(elist[i].y + img_enemy[19]->h / 2) - (shipy + img_player[shipimg]->h / 2),
+									(shipx + img_player[shipimg]->w / 2) - (elist[i].x + img_enemy[19]->w / 2));
+
+								createenemy(14, elist[i].x + (img_enemy[19]->w - img_enemy[13]->w) / 2, elist[i].y + (img_enemy[19]->h - img_enemy[13]->h) / 2, 900, j & 0xFF);
+							}
+							break;
+						case 21:               //rocket boss
+							elist[i].x += SCROLLSPEED * urate * elist[i].arg1;
+
+							if (elist[i].x <= 250) elist[i].arg1 = 1;
+							else if (elist[i].x + img_enemy[18]->w >= 550) elist[i].arg1 = -1;
+
+							elist[i].timer += urate;
+							if (elist[i].timer >= 2000) {
+								elist[i].timer -= 2000;
+								createenemy(11, elist[i].x, elist[i].y + 48, 1, 160);
+								createenemy(12, elist[i].x - 4 + 64, elist[i].y + 64, 1, 192);
+								createenemy(13, elist[i].x - 8 + 128, elist[i].y + 48, 1, 224);
+
+								//								int ctr_x = elist[i].x + (64 << 5);
+								playnoise(E_SHOT, rate, elist[i].x + 64);
+							}
+
+							break;
+						case 22:               //spinner boss
+							elist[i].x += urate * SCROLLSPEED * elist[i].arg1;
+
+							if (elist[i].x <= 128) elist[i].arg1 = 1;
+							else if (elist[i].x + img_enemy[18]->w >= 672) elist[i].arg1 = -1;
+
+							elist[i].timer += urate;
+
+							if (elist[i].timer >= 5000) {
+								elist[i].timer -= 5000;
+								int ctr_x = elist[i].x + 64;
+								createenemy(2, ctr_x - img_enemy[1]->w / 2, elist[i].y + 32, 192, elist[i].arg1 * 11);
+								playnoise(E_SHOT, rate, ctr_x);
+							}
+
+							break;
 						}
-						if (elist[i].type != 0){
-							if (invuln == 0)
-								if ((elist[i].x-(img_enemy[elist[i].type-1]->w/2)<shipx+32) && (elist[i].x+(img_enemy[elist[i].type-1]->w/2)>shipx-32) && (elist[i].y-(img_enemy[elist[i].type-1]->h/2)<shipy+32) && (elist[i].y+(img_enemy[elist[i].type-1]->h/2)>shipy-32) )
-								{
-									elist[i].life--;
-									lives--;
-									invuln = 100;
-									createexplosion(shipx, shipy, 1);
-								}
-							if (elist[i].life <= 0) {*score += scores[elist[i].type]; createexplosion(elist[i].x, elist[i].y, 2);
-								if (elist[i].type>248 || (elist[i].type > 241 && elist[i].type < 245)) {
-									// Just for fun, make one of these big blue bombs go off.
-									if (elist[i].type > 241 && elist[i].type < 245)
-										createexplosion(elist[i].x, elist[i].y, 5);
-									createexplosion(elist[i].x-32, elist[i].y-32, 1);
-									createexplosion(elist[i].x+32, elist[i].y-32, 3);
-									createexplosion(elist[i].x-32, elist[i].y+32, 3);
-									createexplosion(elist[i].x+32, elist[i].y+32, 1);
-								}
-								elist[i].type = 0;}
-							if (elist[i].y<0 || elist[i].y>600 || elist[i].x<0 || elist[i].x>800) elist[i].type = 0;
+
+						// if enemy didn't die before now...
+						if (elist[i].type) {
+							// enemy has flown off-screen, remove it
+							if (elist[i].y + img_enemy[elist[i].type - 1]->h <= 0 || elist[i].y >= 600 ||
+								elist[i].x + img_enemy[elist[i].type - 1]->w <= 0 || elist[i].x >= 800)
+								elist[i].type = 0;
+
+							// enemy was killed this frame
+							else if (elist[i].life <= 0) {
+								*score += scores[elist[i].type - 1];
+								int ctr_x = elist[i].x + img_enemy[elist[i].type - 1]->w / 2;
+								int ctr_y = elist[i].y + img_enemy[elist[i].type - 1]->h / 2;
+
+								createexplosion(2,
+									ctr_x,
+									ctr_y
+									);
+
+								// boss explosion
+								if (elist[i].type > 14) {
+									if (elist[i].type < 18)
+										// Just for fun, make one of these big blue bombs go off.
+										createexplosion(5, ctr_x, ctr_y);
+									// some other scattered explosions for bosses
+									createexplosion(1, ctr_x - 32, ctr_y - 32);
+									createexplosion(3, ctr_x + 32, ctr_y - 32);
+									createexplosion(3, ctr_x - 32, ctr_y + 32);
+									createexplosion(1, ctr_x + 32, ctr_y + 32);
+									playnoise(B_DIE, rate, ctr_x);
+								} else
+									playnoise(E_DIE, rate, ctr_x);
+
+								elist[i].type = 0;
+							}
+
+							// collision with player
+							else if (invuln == 0 && check_pixel_collision(elist[i].x, elist[i].y, shipx, shipy,
+								img_enemy[elist[i].type - 1], img_player[shipimg]))
+							{
+								elist[i].life-= 5;
+								invuln = 5000;
+								int ctr_x = shipx + img_player[shipimg]->w / 2;
+								createexplosion(1, ctr_x, shipy + img_player[shipimg]->h / 2);
+								playnoise(P_DIE, rate, ctr_x);
+								lives--;
+							}
 						}
 					}
 				}
-
-				if (invuln>0) {invuln -= urate; shipimg = 3;}
-				if (invuln<0) invuln = 0;
-
 			}
-		}
 
-		/* draw */
-		if (gpause == 1)
-		{
-			SDL_BlitSurface(img_pause, NULL, env->screen, &pauserect);
-		} else {
-			bgpos += .5 * urate * SCROLLSPEED;
-			strippos += urate * SCROLLSPEED;
-			overlaypos += 2*urate * SCROLLSPEED;
-			if (overlaypos >= 0) overlaypos = -600;
-			if (strippos >= -40) {
-				strippos = -168;
-				
-				stripindex++;
-				
-				while (slist[spawnpos].when <= stripindex)
-				{
-					createenemy(slist[spawnpos].x, slist[spawnpos].y, slist[spawnpos].type, slist[spawnpos].arg1, slist[spawnpos].arg2, slist[spawnpos].life);
-
-					if (slist[spawnpos].type>248)
-					{
-						Mix_FreeMusic(music);
-						glevel = 0;
-						if (music_boss != NULL) Mix_PlayMusic(music_boss, -1);
-					}
-					spawnpos++;
-				}
-			}
-			if (bgpos >= 0) bgpos = -600;
-			bgrect.y = (int)bgpos;
+			/* draw */
+			// Background
+			bgrect.y = bgpos;
 			SDL_BlitSurface(bg, NULL, env->screen, &bgrect);
-			bgrect.y = (int)bgpos+600;
+			bgrect.y -= 600;
 			SDL_BlitSurface(bg, NULL, env->screen, &bgrect);
+			// Up to six "strips" (bg image slices)
+			striprect.y = strippos;
 
-			if (stripindex>121) stripindex = 121;
-
-			for(i = 0;i<6;i++)
-			{
-				striprect.y = (int)strippos+128*i;
-				SDL_BlitSurface(strips[stripslist[stripindex+6-i]], NULL, env->screen, &striprect);
-			}
-
-			for (i = 0;i<SCREENBUL;i++)
-			{
-				if (bullets[i].type != 0)
-				{
-					bulletrect.x = (int)(bullets[i].x+.5)-4;
-					bulletrect.y = (int)(bullets[i].y+.5)-4;
-					SDL_BlitSurface(img_shot[bullets[i].type-1], NULL, env->screen, &bulletrect);
-				}
-			}
-
-			for (i = 0;i<SCREENE;i++)
-			{
-				if (elist[i].type != 0)
-				{
-					erect.w = img_enemy[elist[i].type-1]->w;
-					erect.h = img_enemy[elist[i].type-1]->h;
-					erect.x = (int)(elist[i].x+.5)-(erect.w/2);
-					erect.y = (int)(elist[i].y+.5)-(erect.h/2);
-					SDL_BlitSurface(img_enemy[elist[i].type-1], NULL, env->screen, &erect);
-				}
-			}
-
-			shiprect.x = (int)shipx-32;
-			shiprect.y = (int)shipy-32;
-			SDL_BlitSurface(img_player[shipimg], NULL, env->screen, &shiprect);
-
-			for (i = 0;i<SCREENEX;i++)
-			{
-				if (explo[i].type != 0)
-				{
-					erect.w = img_explo[5*(explo[i].type-1)]->w;
-					erect.h = img_explo[5*(explo[i].type-1)]->h;
-					erect.x = (int)(explo[i].x+.5)-(erect.w/2);
-					erect.y = (int)(explo[i].y+.5)-(erect.h/2);
-					SDL_BlitSurface(img_explo[(explo[i].type-1)*5+((int)explo[i].img)/EXPLOSPEED], NULL, env->screen, &erect);
-				}
+			for (i = 0; i < 6; i++) {
+				SDL_BlitSurface(strips[stripslist[stripindex + i]], NULL, env->screen, &striprect);
+				striprect.y -= 128;
 			}
 
 			/* Speed lines */
-			bgrect.y = (int)overlaypos;
+			bgrect.y = overlaypos;
 			SDL_BlitSurface(img_overlay[(int)rate], NULL, env->screen, &bgrect);
-			bgrect.y = (int)overlaypos+600;
+			bgrect.y -= 600;
 			SDL_BlitSurface(img_overlay[(int)rate], NULL, env->screen, &bgrect);
+
+			/* Debug grid */
+			if (env->debug) {
+				SDL_Rect tmprect = { .w = 1, .h = 600, .y = 0 };
+				for (tmprect.x = 100; tmprect.x < 800; tmprect.x += 100)
+				{
+					SDL_FillRect(env->screen, &tmprect, color_blue);
+				}
+			}
+
+			// all enemies
+			for (i = 0; i < SCREENE; i++) {
+				if (elist[i].type != 0) {
+					SDL_Rect tmprect = {
+						.w = img_enemy[elist[i].type - 1]->w,
+						.h = img_enemy[elist[i].type - 1]->h,
+						.x = elist[i].x,
+						.y = elist[i].y
+					};
+					SDL_BlitSurface(img_enemy[elist[i].type - 1], NULL, env->screen, &tmprect);
+				}
+			}
+
+			// player sprite
+			shiprect.x = shipx;
+			shiprect.y = shipy;
+			SDL_BlitSurface(img_player[shipimg], NULL, env->screen, &shiprect);
+
+			// all bullets
+			for (i = 0; i < SCREENBUL; i++) {
+				if (bullets[i].type != 0) {
+					bulletrect.h = img_shot[bullets[i].type - 1]->w;
+					bulletrect.x = bullets[i].x;
+					bulletrect.y = bullets[i].y;
+					SDL_BlitSurface(img_shot[bullets[i].type - 1], NULL, env->screen, &bulletrect);
+				}
+			}
+
+			// all explosions
+			for (i = 0; i < SCREENEX; i++) {
+				// don't show off-screen ones
+				if (explo[i].type != 0 && explo[i].y < 600) {
+					int frame = (explo[i].type - 1) * 5 + explo[i].timer;
+					SDL_Rect tmprect = {
+						.w = img_explo[frame]->w,
+						.h = img_explo[frame]->h,
+						.x = explo[i].x,
+						.y = explo[i].y
+					};
+					SDL_BlitSurface(img_explo[frame], NULL, env->screen, &tmprect);
+				}
+			}
+
+			/* HUD items */
+			if (gpause)
+				SDL_BlitSurface(img_pause, NULL, env->screen, &pauserect);
+
+			// lives
+			SDL_BlitSurface(img_player[1], NULL, env->screen, NULL);
+			blit_number(env->screen, 80, 16, lives - 1);
+			// score
+			blit_number(env->screen, 768, 16, *score);
+			// time meter
+			indicrect.w = speedbar;
+			SDL_FillRect(env->screen, &indicrect, color_blue);
+			if (env->debug) {
+				blit_number(env->screen, 80, 64, stripindex);
+				blit_number(env->screen, 768, 64, spawnidx);
+			}
+			SDL_Flip(env->screen);
 		}
 
-		/* HUD items */
-		// lives
-		SDL_BlitSurface(img_player[1], NULL, env->screen, NULL);
-		blit_number(env->screen, 80, 16, lives - 1);
-		// score
-		blit_number(env->screen, 768, 16, *score);
-		// time meter
-		indicrect.w = (int)speedbar;
-		SDL_FillRect(env->screen, &indicrect, color_blue);
-
-		SDL_Flip (env->screen);
-
-		SDL_Delay (1);
+		SDL_Delay(1);
 	} while (state == STATE_GAME);
 
 	/* *********************************************************************** */
 	/* shut down */
-	if (glevel<6) {
-		for (i = 0;i<42;i++)
-			if (strips[i] != NULL)
-				SDL_FreeSurface(strips[i]); }
+	if (level < 6) {
+		for (i = 0; i < 42; i++)
+			SDL_FreeSurface(strips[i]);
+	}
 
 	Mix_HaltChannel(-1);
-
 	Mix_FreeMusic(music);
-
 	return state;
 }
