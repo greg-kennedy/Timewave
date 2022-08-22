@@ -35,7 +35,7 @@ int state_play(struct env_t* env)
 
 			case STATE_GAME_NEXT:
 				level ++;
-				if (level < 6)
+				if (level <= 6)
 					substate = STATE_GAME;
 				else
 					substate = STATE_GAMEOVER;

@@ -9,7 +9,7 @@ Libs=
 PrivateResource=Timewave_private.rc
 ResourceIncludes=
 MakeIncludes=
-Compiler=
+Compiler=-D__USE_MINGW_ANSI_STDIO=1_@@_
 CppCompiler=
 Linker=-lmingw32 -lSDLMain -lSDL -lSDL_mixer -lSDL_image_@@_
 IsCpp=0

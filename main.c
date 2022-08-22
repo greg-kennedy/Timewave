@@ -19,8 +19,8 @@
 // helper int-to-string function
 static const char* to_string(int i)
 {
-	static char buffer[12];
-	snprintf(buffer, 12, "%d", i);
+	static char buffer[12] = { 0 };
+	sprintf(buffer, "%d", i);
 	return buffer;
 }
 
@@ -28,6 +28,7 @@ static const char* to_string(int i)
 // Main entry point
 int main (int argc, char* argv[])
 {
+	int i;
 	int ret = EXIT_SUCCESS;
 
 	printf("Timewave v1.3 - Greg Kennedy 2016\n");
@@ -62,6 +63,7 @@ int main (int argc, char* argv[])
 	cfg_set(cfg, "ARCADE", "0");
 	cfg_set(cfg, "MUSIC", "1");
 	cfg_set(cfg, "SFX", "1");
+	cfg_set(cfg, "DEBUG", "0");
 
 	cfg_set(cfg, "KEY_UP", to_string(SDLK_UP));
 	cfg_set(cfg, "KEY_DOWN", to_string(SDLK_DOWN));
@@ -88,7 +90,7 @@ int main (int argc, char* argv[])
 	cfg_load(cfg, "config.ini");
 
 	// other config files on command line
-	for (int i = 1; i < argc; i ++)
+	for (i = 1; i < argc; i ++)
 	{
 		printf("\tReading additional config information from %s.\n", argv[i]);
 		cfg_load(cfg, argv[i]);
@@ -217,7 +219,7 @@ int main (int argc, char* argv[])
 		goto error;
 	}
 
-	env.cursor = load_image("img/ui/cursor.png", 1);
+	env.cursor = load_image("img/ui/cursor.png", 3);
 	if (env.cursor == NULL)
 	{
 		free_common();
@@ -228,6 +230,8 @@ int main (int argc, char* argv[])
 	/* read sfx and music switches from cfg */
 	env.sfx_on = atoi(cfg_get(cfg, "SFX"));
 	env.mus_on = atoi(cfg_get(cfg, "MUSIC"));
+	/* cheat keys enobled */
+	env.debug = atoi(cfg_get(cfg, "DEBUG"));
 
 	/* Read key config from cfg */
 	env.KEY_UP = atoi(cfg_get(cfg, "KEY_UP"));
@@ -305,6 +309,10 @@ int main (int argc, char* argv[])
 	cfg_set(cfg, "SCORE_2", buffer);
 	sprintf(buffer, "%d,%d,%d,%d", env.hs_score[2], env.hs_red[2], env.hs_green[2], env.hs_blue[2]);
 	cfg_set(cfg, "SCORE_3", buffer);
+
+	// if "debug" is disabled, don't write a key for this
+	if (! env.debug)
+		cfg_delete(cfg, "DEBUG");
 
 	// save config to disk
 	cfg_save(cfg, "config.ini");

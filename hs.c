@@ -10,6 +10,8 @@
 /* HIGH SCORE DISPLAY */
 int state_hs(struct env_t* env, const int arcade_mode)
 {
+	int i;
+
 	/* Load the resources for this screen */
 	SDL_Surface *bg = load_image("img/ui/hs.png", 0);
 	if (bg == NULL)
@@ -17,7 +19,7 @@ int state_hs(struct env_t* env, const int arcade_mode)
 
 	// generate the three color values for the banner
 	Uint32 color[3];
-	for (int i = 0; i < 3; i ++)
+	for (i = 0; i < 3; i ++)
 		color[i] = SDL_MapRGB(env->screen->format, env->hs_red[i], env->hs_green[i], env->hs_blue[i]);
 
 	// banner squares
