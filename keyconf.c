@@ -37,8 +37,8 @@ int state_keyconf(struct env_t* env)
 	Uint32 lightcolor = color_red;
 
 	int current_configging_key = 0;
-	SDLKey current_held_key = 0;
-	Uint32 key_ticks;
+	SDLKey current_held_key = (SDLKey)0;
+	Uint32 key_ticks = 0;
 
 	/* One-time draw the screen */
 	int dirty = 1;
@@ -65,7 +65,7 @@ int state_keyconf(struct env_t* env)
 						key_ticks = SDL_GetTicks() + 1000;
 					} else {
 						// Pressed multiple keys at once, cancel what we were doing
-						current_held_key = 0;
+						current_held_key = (SDLKey)0;
 						lightcolor = color_red;
 					}
 					dirty = 1;
@@ -77,7 +77,7 @@ int state_keyconf(struct env_t* env)
 					} else if (current_held_key != 0) {
 						// Key release changes the light back to red
 						lightcolor = color_red;
-						current_held_key = 0;
+						current_held_key = (SDLKey)0;
 
 						dirty = 1;
 					}
@@ -91,7 +91,7 @@ int state_keyconf(struct env_t* env)
 		if (current_held_key != 0 && key_ticks < SDL_GetTicks())
 		{
 			env->keys[current_configging_key] = current_held_key;
-			current_held_key = 0;
+			current_held_key = (SDLKey)0;
 			current_configging_key++;
 
 			lightrect.h += 30;

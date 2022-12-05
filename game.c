@@ -9,7 +9,13 @@
 #include <math.h>
 
 #ifndef min
-#define min(X,Y) ((X) < (Y) ? (X) : (Y))
+#define min(a,b)    (((a) < (b)) ? (a) : (b))
+#endif
+
+/* backfill for nextafterf on msvc */
+#ifndef nextafterf
+#include <float.h>
+#define nextafterf _nextafter
 #endif
 
 #include "common.h"
@@ -84,9 +90,9 @@ struct enemy {
 
 struct explosion {
 	unsigned char type;
-	float timer;
 	short x;
 	float y;
+	float timer;
 };
 
 /* ************************************************************** */
@@ -193,7 +199,7 @@ int init_game(struct env_t * env)
 
 /* ************************************************************** */
 // SHARED GAME FREE
-void free_game()
+void free_game(void)
 {
 	int i, j;
 	/* Images */
@@ -241,8 +247,8 @@ static void playnoise(const int sample, const int rate, const float x)
 		int channel = Mix_PlayChannel(-1, chunk, 0);
 
 		if (channel >= 0) {
-			int p = 256.0 / 800.0 * x;
-			Mix_SetPanning(channel, p, 255 - p);
+			int p = x * nextafterf(256.0f, 0) / 800.0f;
+			Mix_SetPanning(channel, 255 - p, p);
 		}
 	}
 }
@@ -313,22 +319,19 @@ static Uint32 get_pixel(const SDL_Surface *surface, const int x, const int y)
 	{
 	case 1:
 		return *p;
-		break;
 
 	case 2:
 		return *(Uint16 *)p;
-		break;
 
 	case 3:
-		if (SDL_BYTEORDER == SDL_BIG_ENDIAN)
+#if SDL_BYTEORDER == SDL_BIG_ENDIAN
 			return p[0] << 16 | p[1] << 8 | p[2];
-		else
+#else
 			return p[0] | p[1] << 8 | p[2] << 16;
-		break;
+#endif
 
 	case 4:
 		return *(Uint32 *)p;
-		break;
 
 	default:
 		return 0;       /* shouldn't happen, but avoids warnings */
@@ -408,12 +411,26 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 	fscanf(fp, "%d\n", &j);
 
 	for (i = 0; i < j; i++)
-		fscanf(fp, "%hhu\n", &stripslist[i]);
+	{
+		int line = 0;
+		fscanf(fp, "%d\n", &line);
+		stripslist[i] = line;
+	}
 
 	fscanf(fp, "%d\n", &j);
 
 	for (i = 0; i < j; i++)
-		fscanf(fp, "%hhu %hhu %hu %hu %hd %hd\n", &slist[i].when, &slist[i].type, &slist[i].x, &slist[i].y, &slist[i].arg1, &slist[i].arg2);
+	{
+		int line[6] = { 0 };
+		// this is a workaround for MSVC not supporting %hhu formats
+		fscanf(fp, "%d %d %d %d %d %d\n", &line[0], &line[1], &line[2], &line[3], &line[4], &line[5]);
+		slist[i].when = line[0];
+		slist[i].type = line[1];
+		slist[i].x = line[2];
+		slist[i].y = line[3];
+		slist[i].arg1 = line[4];
+		slist[i].arg2 = line[5];
+	}
 
 	fclose(fp);
 
@@ -435,12 +452,18 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 	}
 
 	/* setup rectangles */
-	SDL_Rect striprect = { .x = 0, .w = 800, .h = 128 };
-	SDL_Rect bgrect = { .x = 0, .w = 800, .h = 600 };
-	SDL_Rect shiprect = { .w = 64, .h = 64 };
-	SDL_Rect bulletrect = { .h = 8 };
-	SDL_Rect indicrect = { .x = 16, .y = 568, .w = 0, .h = 16 };
-	SDL_Rect pauserect = { .x = 258, .y = 280, .w = 284, .h = 40 };
+	SDL_Rect striprect = {};
+	striprect.w = 800; striprect.h = 128;
+	SDL_Rect bgrect = {};
+	bgrect.w = 800; bgrect.h = 600;
+	SDL_Rect shiprect = {};
+	shiprect.w = 64; shiprect.h = 64;
+	SDL_Rect bulletrect = {};
+	bulletrect.h = 8;
+	SDL_Rect indicrect = {};
+	indicrect.x = 16; indicrect.y = 568; indicrect.h = 16;
+	SDL_Rect pauserect = {};
+	pauserect.x = 258; pauserect.y = 280; pauserect.w = 284; pauserect.h = 40;
 
 	/* other stuff */
 	const Uint32 color_blue = SDL_MapRGB(env->screen->format, 0, 0, 255);
@@ -1255,7 +1278,8 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 
 			/* Debug grid */
 			if (env->debug) {
-				SDL_Rect tmprect = { .w = 1, .h = 600, .y = 0 };
+				SDL_Rect tmprect = {};
+				tmprect.w = 1; tmprect.h = 600;
 				for (tmprect.x = 100; tmprect.x < 800; tmprect.x += 100)
 				{
 					SDL_FillRect(env->screen, &tmprect, color_blue);
@@ -1265,12 +1289,11 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 			// all enemies
 			for (i = 0; i < SCREENE; i++) {
 				if (elist[i].type != 0) {
-					SDL_Rect tmprect = {
-						.w = img_enemy[elist[i].type - 1]->w,
-						.h = img_enemy[elist[i].type - 1]->h,
-						.x = elist[i].x,
-						.y = elist[i].y
-					};
+					SDL_Rect tmprect = {};
+					tmprect.w = img_enemy[elist[i].type - 1]->w;
+					tmprect.h = img_enemy[elist[i].type - 1]->h;
+					tmprect.x = elist[i].x;
+					tmprect.y = elist[i].y;
 					SDL_BlitSurface(img_enemy[elist[i].type - 1], NULL, env->screen, &tmprect);
 				}
 			}
@@ -1295,12 +1318,11 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 				// don't show off-screen ones
 				if (explo[i].type != 0 && explo[i].y < 600) {
 					int frame = (explo[i].type - 1) * 5 + explo[i].timer;
-					SDL_Rect tmprect = {
-						.w = img_explo[frame]->w,
-						.h = img_explo[frame]->h,
-						.x = explo[i].x,
-						.y = explo[i].y
-					};
+					SDL_Rect tmprect = {};
+					tmprect.w = img_explo[frame]->w;
+					tmprect.h = img_explo[frame]->h;
+					tmprect.x = explo[i].x;
+					tmprect.y = explo[i].y;
 					SDL_BlitSurface(img_explo[frame], NULL, env->screen, &tmprect);
 				}
 			}

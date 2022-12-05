@@ -5,7 +5,7 @@
 static SDL_Surface* numbers;
 
 /* ************************************************************************************************************* */
-int init_common()
+int init_common(void)
 {
 	numbers = load_image("img/ui/nums.png", 3);
 	if (numbers == NULL) return 1;
@@ -13,7 +13,7 @@ int init_common()
 	return 0;
 }
 
-void free_common()
+void free_common(void)
 {
 	SDL_FreeSurface(numbers);
 }

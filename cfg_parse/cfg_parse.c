@@ -69,7 +69,7 @@ static char* cfg_trim(const char* str)
     tlen --;
 
   /* copy portion of string to new string */
-  tstr = cfg_malloc(tlen + 1);
+  tstr = (char *)cfg_malloc(tlen + 1);
   tstr[tlen] = '\0';
   if (tlen > 0) memcpy(tstr, str, tlen);
 
@@ -96,7 +96,7 @@ static char* cfg_norm_key(const char* key)
   if (tlen == 0) return NULL;
 
   /* copy portion of string to new string */
-  tkey = cfg_malloc(tlen + 1);
+  tkey = (char *)cfg_malloc(tlen + 1);
   tkey[tlen] = '\0';
   /* Lowercase key and copy */
   for (i = 0; i < tlen; i++)
@@ -109,7 +109,7 @@ static char* cfg_norm_key(const char* key)
 static struct cfg_node* cfg_create_node(char* key, char* value)
 {
   struct cfg_node* cur =
-    cfg_malloc(sizeof(struct cfg_node));
+    (cfg_node *)cfg_malloc(sizeof(struct cfg_node));
 
   /* assign key, value */
   cur->key = key;
@@ -128,10 +128,10 @@ static struct cfg_node* cfg_create_node(char* key, char* value)
  * performing any further operations.
  * @return Pointer to newly initialized cfg_struct object.
  */
-struct cfg_struct* cfg_init()
+struct cfg_struct* cfg_init(void)
 {
   struct cfg_struct* cfg =
-    cfg_malloc(sizeof(struct cfg_struct));
+    (cfg_struct *)cfg_malloc(sizeof(struct cfg_struct));
   cfg->head = NULL;
 
   return cfg;
@@ -315,14 +315,14 @@ char** cfg_get_keys(const struct cfg_struct* cfg, size_t* count)
 
   /* now create the array to hold them all */
   if (SIZE_MAX / sizeof(char*) < i) return NULL;
-  keys = cfg_malloc(i * sizeof(char*));
+  keys = (char **)cfg_malloc(i * sizeof(char*));
 
   /* walk the list again, this time allocating and copying each key */
   cur = cfg->head;
   for (*count = 0; *count < i; (*count) ++)
   {
     /* create space to hold the key, and copy it over */
-    keys[*count] = cfg_malloc(strlen(cur->key) + 1);
+    keys[*count] = (char *)cfg_malloc(strlen(cur->key) + 1);
     strcpy(keys[*count], cur->key);
     cur = cur->next;
   }
@@ -372,7 +372,7 @@ void cfg_set(struct cfg_struct* cfg, const char* key, const char* value)
     struct cfg_node* prev;
 
     /* search list for existing key */
-    cur = cfg->head;
+    cur = prev = cfg->head;
     do
     {
       if (strcmp(tkey, cur->key) == 0)
@@ -422,7 +422,7 @@ void cfg_delete(struct cfg_struct* cfg, const char* key)
 {
   char* tkey;
   struct cfg_node* cur;
-  struct cfg_node* prev = NULL;
+  struct cfg_node* prev;
 
   /* safety check: null input */
   if (cfg == NULL || cfg->head == NULL || key == NULL) return;
@@ -433,7 +433,7 @@ void cfg_delete(struct cfg_struct* cfg, const char* key)
   if (tkey == NULL) return;
 
   /* search list for existing key */
-  cur = cfg->head;
+  cur = prev = cfg->head;
   do
   {
     if (strcmp(tkey, cur->key) == 0)
@@ -500,14 +500,14 @@ void cfg_prune(struct cfg_struct* cfg, const char* keys[], const size_t count)
   size_t i, j;
 
   struct cfg_node* cur;
-  struct cfg_node* prev = NULL;
+  struct cfg_node* prev;
 
   /* safety check: null input */
   if (cfg == NULL || cfg->head == NULL || keys == NULL || count == 0 ||
     SIZE_MAX / sizeof(char*) < count) return;
 
   /* First we must prep every key in keys[] using the normalize function. */
-  tkeys = cfg_malloc(count * sizeof(char*));
+  tkeys = (char **)cfg_malloc(count * sizeof(char*));
 
   j = 0;
   for (i = 0; i < count; i ++)
@@ -529,7 +529,7 @@ void cfg_prune(struct cfg_struct* cfg, const char* keys[], const size_t count)
   }
 
   /* Now iterate through the cfg struct and test every entry */
-  cur = cfg->head;
+  cur = prev = cfg->head;
   do
   {
     for (i = 0; i < j; i ++)

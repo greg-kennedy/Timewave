@@ -234,16 +234,16 @@ int main (int argc, char* argv[])
 	env.debug = atoi(cfg_get(cfg, "DEBUG"));
 
 	/* Read key config from cfg */
-	env.KEY_UP = atoi(cfg_get(cfg, "KEY_UP"));
-	env.KEY_DOWN = atoi(cfg_get(cfg, "KEY_DOWN"));
-	env.KEY_LEFT = atoi(cfg_get(cfg, "KEY_LEFT"));
-	env.KEY_RIGHT = atoi(cfg_get(cfg, "KEY_RIGHT"));
-	env.KEY_FIRE = atoi(cfg_get(cfg, "KEY_FIRE"));
-	env.KEY_SPEED_DOWN = atoi(cfg_get(cfg, "KEY_SPEED_DOWN"));
-	env.KEY_SPEED_UP = atoi(cfg_get(cfg, "KEY_SPEED_UP"));
-	env.KEY_START = atoi(cfg_get(cfg, "KEY_START"));
-	env.KEY_PAUSE = atoi(cfg_get(cfg, "KEY_PAUSE"));
-	env.KEY_QUIT = atoi(cfg_get(cfg, "KEY_QUIT"));
+	env.KEY_UP = (SDLKey)atoi(cfg_get(cfg, "KEY_UP"));
+	env.KEY_DOWN = (SDLKey)atoi(cfg_get(cfg, "KEY_DOWN"));
+	env.KEY_LEFT = (SDLKey)atoi(cfg_get(cfg, "KEY_LEFT"));
+	env.KEY_RIGHT = (SDLKey)atoi(cfg_get(cfg, "KEY_RIGHT"));
+	env.KEY_FIRE = (SDLKey)atoi(cfg_get(cfg, "KEY_FIRE"));
+	env.KEY_SPEED_DOWN = (SDLKey)atoi(cfg_get(cfg, "KEY_SPEED_DOWN"));
+	env.KEY_SPEED_UP = (SDLKey)atoi(cfg_get(cfg, "KEY_SPEED_UP"));
+	env.KEY_START = (SDLKey)atoi(cfg_get(cfg, "KEY_START"));
+	env.KEY_PAUSE = (SDLKey)atoi(cfg_get(cfg, "KEY_PAUSE"));
+	env.KEY_QUIT = (SDLKey)atoi(cfg_get(cfg, "KEY_QUIT"));
 
 	/* get high scores from cfg */
 	sscanf(cfg_get(cfg, "SCORE_1"), "%10d,%3d,%3d,%3d", &(env.hs_score[0]), &(env.hs_red[0]), &(env.hs_green[0]), &(env.hs_blue[0]));
@@ -323,9 +323,9 @@ int main (int argc, char* argv[])
 error:
 	ret = EXIT_FAILURE;
 cleanup:
-	if (SDL_JoystickOpened(0)) SDL_JoystickClose(joy);
-	if (env.mus_works) Mix_Quit();
+	if (joy) SDL_JoystickClose(joy);
 	if (env.sfx_works) Mix_CloseAudio();
+	if (env.mus_works) Mix_Quit();
 	IMG_Quit();
 	SDL_Quit();
 

@@ -50,6 +50,14 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
+# Visual Studio
+Debug/
+Release/
+*.ncb
+*.suo
+*.vcproj.*
+
+# Project-specific
 stdout.txt
 stderr.txt
 config.ini
