@@ -9,7 +9,7 @@
 #include <math.h>
 
 #ifndef min
-#define min(X,Y) ((X) < (Y) ? (X) : (Y))
+#define min(a,b)    (((a) < (b)) ? (a) : (b))
 #endif
 
 #include "common.h"
@@ -84,9 +84,9 @@ struct enemy {
 
 struct explosion {
 	unsigned char type;
-	float timer;
 	short x;
 	float y;
+	float timer;
 };
 
 /* ************************************************************** */
@@ -193,7 +193,7 @@ int init_game(struct env_t * env)
 
 /* ************************************************************** */
 // SHARED GAME FREE
-void free_game()
+void free_game(void)
 {
 	int i, j;
 	/* Images */
@@ -241,8 +241,8 @@ static void playnoise(const int sample, const int rate, const float x)
 		int channel = Mix_PlayChannel(-1, chunk, 0);
 
 		if (channel >= 0) {
-			int p = 256.0 / 800.0 * x;
-			Mix_SetPanning(channel, p, 255 - p);
+			int p = 256.0f / 800.0f * x;
+			Mix_SetPanning(channel, 255 - p, p);
 		}
 	}
 }
@@ -313,22 +313,19 @@ static Uint32 get_pixel(const SDL_Surface *surface, const int x, const int y)
 	{
 	case 1:
 		return *p;
-		break;
 
 	case 2:
 		return *(Uint16 *)p;
-		break;
 
 	case 3:
-		if (SDL_BYTEORDER == SDL_BIG_ENDIAN)
+#if SDL_BYTEORDER == SDL_BIG_ENDIAN
 			return p[0] << 16 | p[1] << 8 | p[2];
-		else
+#else
 			return p[0] | p[1] << 8 | p[2] << 16;
-		break;
+#endif
 
 	case 4:
 		return *(Uint32 *)p;
-		break;
 
 	default:
 		return 0;       /* shouldn't happen, but avoids warnings */
@@ -408,12 +405,26 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 	fscanf(fp, "%d\n", &j);
 
 	for (i = 0; i < j; i++)
-		fscanf(fp, "%hhu\n", &stripslist[i]);
+	{
+		int line = 0;
+		fscanf(fp, "%d\n", &line);
+		stripslist[i] = line;
+	}
 
 	fscanf(fp, "%d\n", &j);
 
 	for (i = 0; i < j; i++)
-		fscanf(fp, "%hhu %hhu %hu %hu %hd %hd\n", &slist[i].when, &slist[i].type, &slist[i].x, &slist[i].y, &slist[i].arg1, &slist[i].arg2);
+	{
+		int line[6] = { 0 };
+		// this is a workaround for MSVC not supporting %hhu formats
+		fscanf(fp, "%d %d %d %d %d %d\n", &line[0], &line[1], &line[2], &line[3], &line[4], &line[5]);
+		slist[i].when = line[0];
+		slist[i].type = line[1];
+		slist[i].x = line[2];
+		slist[i].y = line[3];
+		slist[i].arg1 = line[4];
+		slist[i].arg2 = line[5];
+	}
 
 	fclose(fp);
 

@@ -34,7 +34,7 @@ extern "C" {
 /**
  * @brief Creates a cfg_struct.
  */
-struct cfg_struct* cfg_init();
+struct cfg_struct* cfg_init(void);
 
 /**
  * @brief Frees a cfg_struct.

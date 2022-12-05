@@ -128,7 +128,7 @@ static struct cfg_node* cfg_create_node(char* key, char* value)
  * performing any further operations.
  * @return Pointer to newly initialized cfg_struct object.
  */
-struct cfg_struct* cfg_init()
+struct cfg_struct* cfg_init(void)
 {
   struct cfg_struct* cfg =
     cfg_malloc(sizeof(struct cfg_struct));
@@ -372,7 +372,7 @@ void cfg_set(struct cfg_struct* cfg, const char* key, const char* value)
     struct cfg_node* prev;
 
     /* search list for existing key */
-    cur = cfg->head;
+    cur = prev = cfg->head;
     do
     {
       if (strcmp(tkey, cur->key) == 0)
@@ -422,7 +422,7 @@ void cfg_delete(struct cfg_struct* cfg, const char* key)
 {
   char* tkey;
   struct cfg_node* cur;
-  struct cfg_node* prev = NULL;
+  struct cfg_node* prev;
 
   /* safety check: null input */
   if (cfg == NULL || cfg->head == NULL || key == NULL) return;
@@ -433,7 +433,7 @@ void cfg_delete(struct cfg_struct* cfg, const char* key)
   if (tkey == NULL) return;
 
   /* search list for existing key */
-  cur = cfg->head;
+  cur = prev = cfg->head;
   do
   {
     if (strcmp(tkey, cur->key) == 0)
@@ -500,7 +500,7 @@ void cfg_prune(struct cfg_struct* cfg, const char* keys[], const size_t count)
   size_t i, j;
 
   struct cfg_node* cur;
-  struct cfg_node* prev = NULL;
+  struct cfg_node* prev;
 
   /* safety check: null input */
   if (cfg == NULL || cfg->head == NULL || keys == NULL || count == 0 ||
@@ -529,7 +529,7 @@ void cfg_prune(struct cfg_struct* cfg, const char* keys[], const size_t count)
   }
 
   /* Now iterate through the cfg struct and test every entry */
-  cur = cfg->head;
+  cur = prev = cfg->head;
   do
   {
     for (i = 0; i < j; i ++)

@@ -58,8 +58,8 @@ struct env_t
 };
 
 /* Init and shutdown things needed (below) */
-int init_common();
-void free_common();
+int init_common(void);
+void free_common(void);
 
 /* common functions used across all modules */
 SDL_Surface* load_image(const char* path, int alpha);

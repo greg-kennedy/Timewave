@@ -38,7 +38,7 @@ int state_keyconf(struct env_t* env)
 
 	int current_configging_key = 0;
 	SDLKey current_held_key = 0;
-	Uint32 key_ticks;
+	Uint32 key_ticks = 0;
 
 	/* One-time draw the screen */
 	int dirty = 1;
