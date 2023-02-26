@@ -50,12 +50,10 @@ int state_menu(struct env_t* env, Mix_Music* music)
 						state = STATE_PLAY;
 					break;
 				case SDL_JOYBUTTONUP:
-					if (event.jbutton.which == 0) {
-						if (event.jbutton.button == 0)
-							state = STATE_PLAY;
-						else if (event.jbutton.button == 1)
-							state = STATE_HS;
-					}
+					if (event.jbutton.button == env->buttons[0])
+						state = STATE_PLAY;
+					else
+						state = STATE_HS;
 					break;
 				case SDL_MOUSEBUTTONUP:
 					mx = event.button.x;

@@ -18,7 +18,7 @@
 #define STATE_PLAY 2
 
 // this is not specified anywhere, so...
-#define MIX_DEFAULT_BUFFERS "4096"
+#define MIX_DEFAULT_BUFFERS "1024"
 
 // helpers
 #define KEY_UP keys[0]
@@ -46,6 +46,8 @@ struct env_t
 
 	// Key bindings
 	SDLKey keys[10];
+	// Joystick buttons
+	int buttons[4];
 
 	// High scores
 	int hs_score[3];

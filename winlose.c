@@ -42,7 +42,7 @@ int state_gameover(struct env_t* env, const int score)
 						state = STATE_PLAY_END;
 					break;
 				case SDL_JOYBUTTONUP:
-					if (event.jbutton.which == 0 && event.jbutton.button == 0 && wl_debounce < SDL_GetTicks())
+					if (event.jbutton.button == env->buttons[0] && wl_debounce < SDL_GetTicks())
 						state = STATE_PLAY_END;
 					break;
 				case SDL_MOUSEBUTTONUP:
@@ -103,7 +103,7 @@ int state_victory(struct env_t* env, const int score)
 					dirty = 1;
 					break;
 				case SDL_JOYBUTTONUP:
-					if (event.jbutton.which == 0 && event.jbutton.button == 0 && wl_debounce < SDL_GetTicks())
+					if (event.jbutton.button == env->buttons[0] && wl_debounce < SDL_GetTicks())
 						state = STATE_GAME_NEXT;
 					break;
 				case SDL_KEYUP:

@@ -76,6 +76,11 @@ int main (int argc, char* argv[])
 	cfg_set(cfg, "KEY_PAUSE", to_string(SDLK_p));
 	cfg_set(cfg, "KEY_QUIT", to_string(SDLK_ESCAPE));
 
+	cfg_set(cfg, "JOY_FIRE", "0");
+	cfg_set(cfg, "JOY_SPEED_DOWN", "1");
+	cfg_set(cfg, "JOY_SPEED_UP", "2");
+	cfg_set(cfg, "JOY_PAUSE", "3");
+
 	cfg_set(cfg, "AUDIO_RATE", to_string(MIX_DEFAULT_FREQUENCY));
 	cfg_set(cfg, "AUDIO_FORMAT", to_string(MIX_DEFAULT_FORMAT));
 	cfg_set(cfg, "AUDIO_CHANNELS", to_string(MIX_DEFAULT_CHANNELS));
@@ -144,6 +149,22 @@ int main (int argc, char* argv[])
 			const int times_opened = Mix_QuerySpec(&audio_rate, &audio_format, &audio_channels);
 			printf("Opened audio mixer - Times: %d, Rate: %d, Format: %hu, Channels: %d\n", times_opened, audio_rate, audio_format, audio_channels);
 
+			Mix_AllocateChannels(32);
+			// Reserve 4 channels - one for speed up / down sound effects, one for player shot, one for player death, one for enemy deaths
+			int reserved_count;
+			reserved_count = Mix_ReserveChannels(4);
+			if(reserved_count!=4) {
+				printf("reserved %d channels from default mixing.\n",reserved_count);
+				printf("4 channels were not reserved!\n");
+			}
+			// put the remaining 28 channels into a group
+			reserved_count = Mix_GroupChannels(4,31,0);
+			if (reserved_count != 28) {
+			    // some bad channels, apparently some channels aren't allocated
+				printf("grouped %d channels from default mixing.\n",reserved_count);
+				printf("28 channels were not reserved!\n");
+			}
+
 			env.sfx_works = 1;
 
 			// now try to get modfile loading
@@ -155,6 +176,9 @@ int main (int argc, char* argv[])
 				Mix_Quit();
 			} else {
 				env.mus_works = 1;
+
+				// Music is usually too loud, tone it down
+				Mix_VolumeMusic(MIX_MAX_VOLUME / 4);
 			}
 		}
 	}
@@ -230,7 +254,7 @@ int main (int argc, char* argv[])
 	/* read sfx and music switches from cfg */
 	env.sfx_on = atoi(cfg_get(cfg, "SFX"));
 	env.mus_on = atoi(cfg_get(cfg, "MUSIC"));
-	/* cheat keys enobled */
+	/* cheat keys enabled */
 	env.debug = atoi(cfg_get(cfg, "DEBUG"));
 
 	/* Read key config from cfg */
@@ -244,6 +268,12 @@ int main (int argc, char* argv[])
 	env.KEY_START = (SDLKey)atoi(cfg_get(cfg, "KEY_START"));
 	env.KEY_PAUSE = (SDLKey)atoi(cfg_get(cfg, "KEY_PAUSE"));
 	env.KEY_QUIT = (SDLKey)atoi(cfg_get(cfg, "KEY_QUIT"));
+
+	/* Joystick buttons */
+	env.buttons[0] = atoi(cfg_get(cfg, "JOY_FIRE"));
+	env.buttons[1] = atoi(cfg_get(cfg, "JOY_SPEED_DOWN"));
+	env.buttons[2] = atoi(cfg_get(cfg, "JOY_SPEED_UP"));
+	env.buttons[3] = atoi(cfg_get(cfg, "JOY_PAUSE"));
 
 	/* get high scores from cfg */
 	sscanf(cfg_get(cfg, "SCORE_1"), "%10d,%3d,%3d,%3d", &(env.hs_score[0]), &(env.hs_red[0]), &(env.hs_green[0]), &(env.hs_blue[0]));

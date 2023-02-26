@@ -76,8 +76,33 @@ int state_hspick(struct env_t* env, Mix_Music* music_pause, const int score)
 					else if (event.key.keysym.sym == env->KEY_QUIT  && hspick_debounce < SDL_GetTicks()) state = STATE_UI;
 
 					break;
+		    case SDL_JOYAXISMOTION:
+				if (event.jaxis.axis == 0) { // left-right movement
+					if (event.jaxis.value < -4095) {
+						keysdown[2] = 1;
+						keysdown[3] = 0;
+					} else if (event.jaxis.value > 4095) {
+						keysdown[2] = 0;
+						keysdown[3] = 1;
+					} else {
+						keysdown[2] = 0;
+						keysdown[3] = 0;
+					}
+				} else if (event.jaxis.axis == 1) { // up-down axis
+					if (event.jaxis.value < -4095) {
+						keysdown[0] = 1;
+						keysdown[1] = 0;
+					} else if (event.jaxis.value > 4095) {
+						keysdown[0] = 0;
+						keysdown[1] = 1;
+					} else {
+						keysdown[0] = 0;
+						keysdown[1] = 0;
+					}
+				}
+				break;
 				case SDL_JOYBUTTONUP:
-					if (event.jbutton.which == 0 && event.jbutton.button == 0 && hspick_debounce < SDL_GetTicks())
+					if (event.jbutton.button == env->buttons[0] && hspick_debounce < SDL_GetTicks())
 						color_pushed = 1;
 					break;
 				case SDL_MOUSEBUTTONUP:

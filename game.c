@@ -52,9 +52,10 @@
 #define B_DIE 2
 #define P_SHOT 3
 #define E_SHOT 4
+#define E_LAUNCH 5
 
-#define S_UP 5
-#define S_DOWN 6
+#define S_UP 6
+#define S_DOWN 7
 
 /* ************************************************************** */
 // STRUCT DEFINITIONS
@@ -106,7 +107,7 @@ static const unsigned int scores[22] = {
 };
 
 static const short hp[22] = {
-	1, 4, 2, 3, 5, 7, SHRT_MAX, 7,
+	1, 4, 2, 3, 4, 7, SHRT_MAX, 7,
 	1, SHRT_MAX, 1, 1, 1, 1,
 	500, 500, 500, 100, 100, 100, 100, 100
 };
@@ -121,7 +122,7 @@ static struct explosion explo[SCREENEX];
 // PRELOADED Resources
 static Mix_Chunk * chunk_up;
 static Mix_Chunk * chunk_down;
-static Mix_Chunk * chunk_sfx[3][5];
+static Mix_Chunk * chunk_sfx[3][6];
 
 static Mix_Music * music_boss;
 
@@ -178,16 +179,19 @@ int init_game(struct env_t * env)
 		chunk_sfx[SLOW][B_DIE] = load_sample("audio/sex3.wav");
 		chunk_sfx[SLOW][P_SHOT] = load_sample("audio/sbul2.wav");
 		chunk_sfx[SLOW][E_SHOT] = load_sample("audio/sbul1.wav");
+		chunk_sfx[SLOW][E_LAUNCH] = load_sample("audio/slaunch.wav");
 		chunk_sfx[NORMAL][P_DIE] = load_sample("audio/ex2.wav");
 		chunk_sfx[NORMAL][E_DIE] = load_sample("audio/ex1.wav");
 		chunk_sfx[NORMAL][B_DIE] = load_sample("audio/ex3.wav");
 		chunk_sfx[NORMAL][P_SHOT] = load_sample("audio/bul2.wav");
 		chunk_sfx[NORMAL][E_SHOT] = load_sample("audio/bul1.wav");
+		chunk_sfx[NORMAL][E_LAUNCH] = load_sample("audio/launch.wav");
 		chunk_sfx[FAST][P_DIE] = load_sample("audio/fex2.wav");
 		chunk_sfx[FAST][E_DIE] = load_sample("audio/fex1.wav");
 		chunk_sfx[FAST][B_DIE] = load_sample("audio/fex3.wav");
 		chunk_sfx[FAST][P_SHOT] = load_sample("audio/fbul2.wav");
 		chunk_sfx[FAST][E_SHOT] = load_sample("audio/fbul1.wav");
+		chunk_sfx[FAST][E_LAUNCH] = load_sample("audio/flaunch.wav");
 	}
 
 	// BOSS music
@@ -226,7 +230,7 @@ void free_game(void)
 	Mix_FreeChunk(chunk_down);
 
 	for (i = 0; i < 3; i ++)
-		for (j = 0; j < 5; j ++)
+		for (j = 0; j < 6; j ++)
 			Mix_FreeChunk(chunk_sfx[i][j]);
 
 	// Music
@@ -238,13 +242,36 @@ static void playnoise(const int sample, const int rate, const float x)
 {
 	Mix_Chunk * chunk;
 
-	if (sample == 5) chunk = chunk_up;
-	else if (sample == 6) chunk = chunk_down;
+	if (sample == S_UP) chunk = chunk_up;
+	else if (sample == S_DOWN) chunk = chunk_down;
 	else chunk = chunk_sfx[rate][sample];
 
 	if (chunk != NULL) {
-		// TODO: possibly kill oldest channel to make room for a new sample
-		int channel = Mix_PlayChannel(-1, chunk, 0);
+		int channel;
+		if (sample == S_UP || sample == S_DOWN) {
+			Mix_HaltChannel(0);
+			channel = Mix_PlayChannel(0, chunk, 0);
+		} else if (sample == P_SHOT) {
+			Mix_HaltChannel(1);
+			channel = Mix_PlayChannel(1, chunk, 0);
+		} else if (sample == P_DIE) {
+			Mix_HaltChannel(2);
+			channel = Mix_PlayChannel(2, chunk, 0);
+		} else if (sample == E_DIE || sample == B_DIE) {
+			Mix_HaltChannel(3);
+			channel = Mix_PlayChannel(3, chunk, 0);
+		} else {
+			// Find the oldest
+			channel=Mix_GroupOldest(0);
+			if (channel==-1) {
+				// no channel playing or allocated...
+				// perhaps just search for an available channel...
+				channel = Mix_PlayChannel(-1, chunk, 0);
+			} else {
+				Mix_HaltChannel(channel);
+				channel = Mix_PlayChannel(channel, chunk, 0);
+			}
+		}
 
 		if (channel >= 0) {
 			int p = x * nextafterf(256.0f, 0) / 800.0f;
@@ -509,7 +536,6 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 	int boss_timer = 0;
 
 	unsigned char keysdown[7] = {0};
-	unsigned char joystate[7] = {0};
 	// SDL_Ticks since last update
 	unsigned long tickslastupdate = SDL_GetTicks();
 	/* Event loop */
@@ -534,6 +560,7 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 
 				break;
 
+			// KEYBOARD
 			case SDL_KEYDOWN:
 				if (event.key.keysym.sym == env->KEY_UP)
 					keysdown[0] = 1;
@@ -592,46 +619,71 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 
 				break;
 
+			// JOYSTICK
+		    case SDL_JOYAXISMOTION:
+				if (event.jaxis.axis == 0) { // left-right movement
+					if (event.jaxis.value < -4095) {
+						keysdown[2] = 1;
+						keysdown[3] = 0;
+					} else if (event.jaxis.value > 4095) {
+						keysdown[2] = 0;
+						keysdown[3] = 1;
+					} else {
+						keysdown[2] = 0;
+						keysdown[3] = 0;
+					}
+				} else if (event.jaxis.axis == 1) { // up-down axis
+					if (event.jaxis.value < -4095) {
+						keysdown[0] = 1;
+						keysdown[1] = 0;
+					} else if (event.jaxis.value > 4095) {
+						keysdown[0] = 0;
+						keysdown[1] = 1;
+					} else {
+						keysdown[0] = 0;
+						keysdown[1] = 0;
+					}
+				}
+				break;
+
+			case SDL_JOYBUTTONDOWN:
+				if ( event.jbutton.button == env->buttons[0] ) 
+						keysdown[4] = 1;
+				else if ( event.jbutton.button == env->buttons[1] ) 
+						keysdown[5] = 1;
+				else if ( event.jbutton.button == env->buttons[2] ) 
+						keysdown[6] = 1;
+				break;
+
+			case SDL_JOYBUTTONUP:
+			    if ( event.jbutton.button == env->buttons[0] ) 
+						keysdown[4] = 0;
+			    else if ( event.jbutton.button == env->buttons[1] ) 
+						keysdown[5] = 0;
+			    else if ( event.jbutton.button == env->buttons[2] ) 
+						keysdown[6] = 0;
+				else if (event.jbutton.button == env->buttons[3]) {
+					if (gpause == 0) {
+						if (env->mus_on == 1) {
+							Mix_PlayMusic(music_pause, -1);
+						}
+
+						gpause = 1;
+					} else {
+						if (env->mus_on == 1) {
+							Mix_PlayMusic(music, -1);
+						}
+
+						gpause = 0;
+					}
+				}
+				break;
+
 			case SDL_QUIT:
 				state = STATE_QUIT;
 			}
 		}
 
-		/* here we use the joystick to fake keypresses : ) */
-		/*			if (joysticks>0)
-					{
-						axis = SDL_JoystickGetAxis(joy, 0);
-						if (axis < -10923) {
-							joystate[2] = 1;
-							joystate[3] = 0;
-						} else if (axis > 10923) {
-							joystate[2] = 0;
-							joystate[3] = 1;
-						} else {
-							joystate[2] = 0;
-							joystate[3] = 0;
-						}
-
-						axis = SDL_JoystickGetAxis(joy, 1);
-						if (axis < -10923) {
-							joystate[0] = 0;
-							joystate[1] = 1;
-						} else if (axis > 10923) {
-							joystate[0] = 1;
-							joystate[1] = 0;
-						} else {
-							joystate[0] = 0;
-							joystate[1] = 0;
-						}
-
-						button = SDL_JoystickGetButton(joy, 0);
-						if (button) joystate[6] = 1; else joystate[6] = 0;
-						button = SDL_JoystickGetButton(joy, 1);
-						if (button) joystate[4] = 1; else joystate[4] = 0;
-						button = SDL_JoystickGetButton(joy, 2);
-						if (button) joystate[5] = 1; else joystate[5] = 0;
-					}
-				}*/
 		/* update time step */
 		unsigned long tempticks = SDL_GetTicks();
 		// calculate the number of ticks between before and now
@@ -646,22 +698,22 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 				int urate = (1 << rate) * t_diff;
 
 				// ship movement
-				if (keysdown[0] != 0 || joystate[0] != 0) {
+				if (keysdown[0] != 0) {
 					shipy -= (t_diff * SHIPSPEED);
 
 					if (shipy < 0) shipy = 0;
-				} else if (keysdown[1] != 0 || joystate[1] != 0) {
+				} else if (keysdown[1] != 0) {
 					shipy += (t_diff * SHIPSPEED);
 
 					if (shipy >= 600 - img_player[shipimg]->h) shipy = nextafterf(600 - img_player[shipimg]->h, 0);
 				}
 
-				if (keysdown[2] != 0 || joystate[2] != 0) {
+				if (keysdown[2] != 0) {
 					shipimg = 0;
 					shipx -= (t_diff * SHIPSPEED);
 
 					if (shipx < 0) shipx = 0;
-				} else if (keysdown[3] != 0 || joystate[3] != 0) {
+				} else if (keysdown[3] != 0) {
 					shipimg = 2;
 					shipx += (t_diff * SHIPSPEED);
 
@@ -672,7 +724,7 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 				// firing a bullet
 				if (cooldown > 0) cooldown -= urate;
 
-				if ((joystate[4] != 0 || keysdown[4] != 0) && cooldown <= 0) {
+				if (keysdown[4] != 0 && cooldown <= 0) {
 					createbullet(1, 64, shipx, shipy + img_player[shipimg]->h / 2, 4);
 					createbullet(1, 64, shipx + img_player[shipimg]->w, shipy + img_player[shipimg]->h / 2, 4);
 					cooldown = 500;
@@ -681,12 +733,12 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 
 				// handle speed changes
 				int prev_rate = rate;
-				if ((keysdown[5] != 0 || joystate[5] != 0) && (env->debug || speedbar > 0)) {
+				if (keysdown[5] != 0 && (env->debug || speedbar > 0)) {
 					rate = 0;
 					speedbar -= t_diff * BARSPEED;
 
 					if (speedbar < 0) speedbar = 0;
-				} else if (keysdown[6] != 0 || joystate[6] != 0) {
+				} else if (keysdown[6] != 0) {
 					rate = 2;
 					speedbar += t_diff * BARSPEED;
 
@@ -844,7 +896,7 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 								float ctr_x = elist[i].x + img_enemy[2]->w / 2;
 
 								createenemy(12, ctr_x - img_enemy[12]->w / 2, elist[i].y + img_enemy[2]->h, 1, 192);
-								playnoise(E_SHOT, rate, ctr_x);
+								playnoise(E_LAUNCH, rate, ctr_x);
 							}
 
 							break;
@@ -932,7 +984,7 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 								{
 									elist[i].timer -= 5000;
 									createenemy(9, elist[i].x + (img_enemy[7]->w - img_enemy[8]->w) / 2, elist[i].y, 0, 0);
-									playnoise(E_SHOT, rate, elist[i].x + img_enemy[7]->w / 2);
+									playnoise(E_LAUNCH, rate, elist[i].x + img_enemy[7]->w / 2);
 								}
 							}
 							break;
@@ -1054,7 +1106,7 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 									case 0:				// time draining bomb
 										if (elist[i].arg2 == 0) {
 											createenemy(10, ctr_x, ctr_y, 0, 0);
-											playnoise(E_SHOT, rate, ctr_x);
+											playnoise(E_LAUNCH, rate, ctr_x);
 										}
 										break;
 									case 1:				// machine gun
@@ -1073,14 +1125,14 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 											createenemy(7, 584, -32, 0, 0);
 											createenemy(7, 684, -32, 0, 0);
 											createenemy(7, 768, -32, 0, 0);
-											//											playnoise(E_SHOT, rate, ctr_x);
+											playnoise(E_LAUNCH, rate, ctr_x);
 										}
 										break;
 									case 3:				// rocket salvo
 										if (elist[i].arg2 % 20 == 0) {
 											for (j = 0; j <= 4; j++)
 												createenemy(12, ctr_x + (32 * (j - 2)), ctr_y, 1, 160 * 16+j);
-											playnoise(E_SHOT, rate, ctr_x);
+											playnoise(E_LAUNCH, rate, ctr_x);
 										}
 										break;
 									case 4:				// two spinners
@@ -1089,7 +1141,7 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 											createenemy(2, 184, -32, 0, -13);
 											createenemy(2, 584, -32, 128, 13);
 											createenemy(5, 384, -32, 484, 0);
-//											playnoise(E_SHOT, rate, ctr_x);
+											playnoise(E_LAUNCH, rate, ctr_x);
 										}
 										break;
 									}
@@ -1136,7 +1188,9 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 								for (j = gap + 4; j <= 255; j++)
 									createbullet(2, j, ctr_x, elist[i].y, 4);
 
-								playnoise(E_SHOT, rate, ctr_x);
+								// play a bunch of shooty noises
+								playnoise(E_SHOT, rate, 400);
+								playnoise(E_LAUNCH, rate, 400);
 							}
 
 							break;
@@ -1152,7 +1206,7 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 								elist[i].timer -= 5000;
 								int ctr_x = elist[i].x + img_enemy[18]->w / 2;
 								createenemy(5, ctr_x - img_enemy[4]->w / 2, elist[i].y + img_enemy[18]->h, shipy + img_player[shipimg]->h / 2 - img_enemy[4]->h / 2, 0);
-								playnoise(E_SHOT, rate, ctr_x);
+								playnoise(E_LAUNCH, rate, ctr_x);
 							}
 
 							break;
@@ -1176,14 +1230,14 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 							else if (elist[i].x + img_enemy[18]->w >= 550) elist[i].arg1 = -1;
 
 							elist[i].timer += urate;
-							if (elist[i].timer >= 2000) {
-								elist[i].timer -= 2000;
+							if (elist[i].timer >= 3000) {
+								elist[i].timer -= 3000;
 								createenemy(11, elist[i].x, elist[i].y + 48, 1, 160);
 								createenemy(12, elist[i].x - 4 + 64, elist[i].y + 64, 1, 192);
 								createenemy(13, elist[i].x - 8 + 128, elist[i].y + 48, 1, 224);
 
 								//								int ctr_x = elist[i].x + (64 << 5);
-								playnoise(E_SHOT, rate, elist[i].x + 64);
+								playnoise(E_LAUNCH, rate, elist[i].x + 64);
 							}
 
 							break;
@@ -1199,7 +1253,7 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 								elist[i].timer -= 5000;
 								int ctr_x = elist[i].x + 64;
 								createenemy(2, ctr_x - img_enemy[1]->w / 2, elist[i].y + 32, 192, elist[i].arg1 * 11);
-								playnoise(E_SHOT, rate, ctr_x);
+								playnoise(E_LAUNCH, rate, ctr_x);
 							}
 
 							break;
