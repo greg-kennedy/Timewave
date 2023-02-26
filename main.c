@@ -178,7 +178,7 @@ int main (int argc, char* argv[])
 				env.mus_works = 1;
 
 				// Music is usually too loud, tone it down
-				Mix_VolumeMusic(MIX_MAX_VOLUME / 4);
+				Mix_VolumeMusic(MIX_MAX_VOLUME / 3);
 			}
 		}
 	}

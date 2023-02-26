@@ -30,7 +30,7 @@
 /* num imgs to load */
 #define MAXSHIPS 4
 #define MAXBULS 5
-#define MAXENS 22
+#define MAXENS 24
 #define MAXEXP 5
 #define MAXSTRIPS 42
 
@@ -98,17 +98,18 @@ struct explosion {
 
 /* ************************************************************** */
 // CONSTANTS
-static const unsigned int scores[22] = {
-	50, 250, 100, 200, 250, 500, 0,
+static const unsigned int scores[MAXENS] = {
+	50, 250, 100, 200, 250, 250, 250, 500, 0,
 	500, 25, 0,
 	10, 10, 10, 0,
 	100000, 100000, 100000,
 	10000, 20000, 30000, 40000, 50000
 };
 
-static const short hp[22] = {
-	1, 4, 2, 3, 4, 7, SHRT_MAX, 7,
-	1, SHRT_MAX, 1, 1, 1, 1,
+static const short hp[MAXENS] = {
+	1, 4, 2, 3, 4, 4, 4, 7, SHRT_MAX,
+	7, 1, SHRT_MAX,
+	1, 1, 1, 1,
 	500, 500, 500, 100, 100, 100, 100, 100
 };
 
@@ -774,7 +775,7 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 							createenemy(slist[spawnidx].type, slist[spawnidx].x, slist[spawnidx].y, slist[spawnidx].arg1, slist[spawnidx].arg2);
 
 							// if an end-level boss spawned, play the boss music
-							if (slist[spawnidx].type > 16) {
+							if (slist[spawnidx].type > 18) {
 								Mix_HaltMusic();
 
 								if (music_boss != NULL) Mix_PlayMusic(music_boss, -1);
@@ -840,7 +841,7 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 								img_shot[bullets[i].type - 1], img_player[shipimg]))
 							{
 								bullets[i].type = 0;
-								invuln = 5000;
+								invuln = 3000;
 								int ctr_x = shipx + img_player[shipimg]->w / 2;
 								createexplosion(1, ctr_x, shipy + img_player[shipimg]->h / 2);
 								playnoise(P_DIE, rate, ctr_x);
@@ -895,7 +896,7 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 
 								float ctr_x = elist[i].x + img_enemy[2]->w / 2;
 
-								createenemy(12, ctr_x - img_enemy[12]->w / 2, elist[i].y + img_enemy[2]->h, 1, 192);
+								createenemy(14, ctr_x - img_enemy[12]->w / 2, elist[i].y + img_enemy[2]->h, 0, 16);
 								playnoise(E_LAUNCH, rate, ctr_x);
 							}
 
@@ -906,36 +907,42 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 							elist[i].timer += urate;
 							if (elist[i].timer >= 175) {
 								elist[i].timer -= 175;
-								switch (elist[i].arg2)
-								{
-								case 2:
-									j = 190;
-									break;
-								case 1:
-								case 3:
-									j = 191;
-									break;
-								case 0:
-								case 4:
-									j = 192;
-									break;
-								case 5:
-								case 7:
-									j = 193;
-									break;
-								case 6:
-									j = 194;
-									break;
-								}
-								elist[i].arg2 = (elist[i].arg2 + 1) % 8;
-								float ctr_x = elist[i].x + img_enemy[3]->w / 2;
-								createbullet(2, j, ctr_x, elist[i].y + img_enemy[3]->h, 5);
-								playnoise(E_SHOT, rate, ctr_x);
+								elist[i].arg1 ++;
+								if (elist[i].arg1 < 7) {
+									switch (elist[i].arg2)
+									{
+									case 2:
+										j = 190;
+										break;
+									case 1:
+									case 3:
+										j = 191;
+										break;
+									case 0:
+									case 4:
+										j = 192;
+										break;
+									case 5:
+									case 7:
+										j = 193;
+										break;
+									case 6:
+										j = 194;
+										break;
+									}
+									elist[i].arg2 = (elist[i].arg2 + 1) % 8;
+									float ctr_x = elist[i].x + img_enemy[3]->w / 2;
+									createbullet(2, j, ctr_x, elist[i].y + img_enemy[3]->h, 5);
+									playnoise(E_SHOT, rate, ctr_x);
+								} else if (elist[i].arg1 > 9)
+									elist[i].arg1 = 0;
 							}
 
 							break;
 
 						case 5:                          // depth charge
+						case 6:                          // depth charge
+						case 7:                          // depth charge
 							elist[i].y += SCROLLSPEED * urate;
 
 							if (elist[i].y >= elist[i].arg1) {
@@ -948,10 +955,11 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 								createexplosion(4, ctr_x, ctr_y);
 								playnoise(E_DIE, rate, ctr_x);
 								elist[i].type = 0;
-							}
+							} else if (elist[i].y + 50 >= elist[i].arg1) elist[i].type = 7;
+							else if (elist[i].y + 150 >= elist[i].arg1) elist[i].type = 6;
 
 							break;
-						case 6:                          //side-shooting upwards rocketguy
+						case 8:                          //side-shooting upwards rocketguy
 							elist[i].y -= SCROLLSPEED * urate;
 
 							elist[i].timer += urate;
@@ -962,17 +970,17 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 								{
 									for (j = 36; j < 89; j += 26) {
 										createbullet(4, 128, elist[i].x, j + elist[i].y, 5);
-										createbullet(4, 0, elist[i].x + img_enemy[5]->w, j + elist[i].y, 5);
+										createbullet(4, 0, elist[i].x + img_enemy[7]->w, j + elist[i].y, 5);
 									}
-									playnoise(E_SHOT, rate, elist[i].x + img_enemy[5]->w / 2);
+									playnoise(E_SHOT, rate, elist[i].x + img_enemy[7]->w / 2);
 								}
 								elist[i].arg1 = (elist[i].arg1 + 1) % 50;
 							}
 							break;
-						case 7:                          //brick!
+						case 9:                          //brick!
 							elist[i].y += SCROLLSPEED * 2 * urate;
 							break;
-						case 8:                          //carrier: launches fighters
+						case 10:                          //carrier: launches fighters
 							if (elist[i].y < 0) {
 								elist[i].y += SCROLLSPEED * urate;
 								if (elist[i].y > 0)
@@ -983,12 +991,12 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 								if (elist[i].timer >= 5000)
 								{
 									elist[i].timer -= 5000;
-									createenemy(9, elist[i].x + (img_enemy[7]->w - img_enemy[8]->w) / 2, elist[i].y, 0, 0);
-									playnoise(E_LAUNCH, rate, elist[i].x + img_enemy[7]->w / 2);
+									createenemy(11, elist[i].x + (img_enemy[9]->w - img_enemy[10]->w) / 2, elist[i].y, 0, 0);
+									playnoise(E_LAUNCH, rate, elist[i].x + img_enemy[9]->w / 2);
 								}
 							}
 							break;
-						case 9:                         //carrier fighter!
+						case 11:                         //carrier fighter!
 							elist[i].y += SCROLLSPEED * urate;
 							if (elist[i].y >= 128) {
 								elist[i].y += SCROLLSPEED * urate;
@@ -999,15 +1007,15 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 								if (elist[i].timer >= 350)
 								{
 									elist[i].timer -= 350;
-									createbullet(5, 192, elist[i].x, elist[i].y + img_enemy[8]->h, 3);
-									createbullet(5, 192, elist[i].x + img_enemy[8]->w, elist[i].y + img_enemy[8]->h, 3);
-									playnoise(E_SHOT, rate, elist[i].x + img_enemy[8]->w / 2);
+									createbullet(5, 192, elist[i].x, elist[i].y + img_enemy[10]->h, 3);
+									createbullet(5, 192, elist[i].x + img_enemy[10]->w, elist[i].y + img_enemy[10]->h, 3);
+									playnoise(E_SHOT, rate, elist[i].x + img_enemy[10]->w / 2);
 								}
 							}
 							break;
-						case 10:                         //uberbomb.
+						case 12:                         //uberbomb.
 							elist[i].y += urate*SCROLLSPEED;
-							if (elist[i].y + img_enemy[9]->h / 2 >= 300)
+							if (elist[i].y + img_enemy[11]->h / 2 >= 300)
 							{
 								speedbar = 0;
 								createexplosion(5, 400, 300);
@@ -1015,12 +1023,12 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 								elist[i].type = 0;
 							}
 							break;
-						case 11:
-						case 12:
-						case 13:              // homing rocket
+						case 13:
+						case 14:
+						case 15:              // homing rocket
 							// movement
-							elist[i].x += SCROLLSPEED * .125 * urate * elist[i].arg1 * cos(M_PI / 128.0 * elist[i].arg2);
-							elist[i].y -= SCROLLSPEED * .125 * urate * elist[i].arg1 * sin(M_PI / 128.0 * elist[i].arg2);
+							elist[i].x += SCROLLSPEED * .0625 * urate * elist[i].arg1;
+							elist[i].y += SCROLLSPEED * .0625 * urate * elist[i].arg2;
 
 							// angle adjustments every 200 msec
 							elist[i].timer += urate;
@@ -1028,29 +1036,28 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 							{
 								elist[i].timer -= 200;
 
-								// speed increase
-								elist[i].arg1++;
+								// rotate missile towards player
+								//  determine angle to player
+								double angle = atan2(
+									(shipy + img_player[shipimg]->h / 2) - (elist[i].y + img_enemy[12]->h / 2),
+									(shipx + img_player[shipimg]->w / 2) - (elist[i].x + img_enemy[12]->w / 2));
 
-								// rotate missile at player
-								j = 128.0 / M_PI * atan2(
-									(elist[i].y + img_enemy[11]->h / 2) - (shipy + img_player[shipimg]->h / 2),
-									(shipx + img_player[shipimg]->w / 2) - (elist[i].x + img_enemy[11]->w / 2));
-								if (j > 0) j = -j;
+								// only adjust speed if angle is within certain ranges
+								if (angle >= M_PI / 4 && angle <= 3 * M_PI / 4) {
+									// adjust speeds
+									elist[i].arg1 += 8 * cos(angle);
+									elist[i].arg2 += 8 * sin(angle);
 
-								elist[i].arg2 = j & 0xFF;
-
-								if (elist[i].arg2 < 160) elist[i].arg2 = 160;
-								if (elist[i].arg2 > 224) elist[i].arg2 = 224;
-
-								// fix graphic
-								if (elist[i].arg2 < 177) elist[i].type = 11;
-								else if (elist[i].arg2 > 207) elist[i].type = 13;
-								else elist[i].type = 12;
+									// fix graphic
+									if (angle < 3 * M_PI / 8) elist[i].type = 15;
+									else if (angle > 5 * M_PI / 8) elist[i].type = 13;
+									else elist[i].type = 14;
+								}
 							}
 
 							break;
 
-						case 14:                // laser boss helper
+						case 16:                // laser boss helper
 							elist[i].arg1 -= urate;
 							if (elist[i].arg1 <= 0)
 								elist[i].type = 0;
@@ -1060,22 +1067,22 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 								if (elist[i].timer >= 50)
 								{
 									elist[i].timer -= 50;
-									int ctr_x = elist[i].x + img_enemy[13]->w / 2;
-									createbullet(5, elist[i].arg2, ctr_x, elist[i].y + img_enemy[13]->h / 2, 5);
+									int ctr_x = elist[i].x + img_enemy[15]->w / 2;
+									createbullet(5, elist[i].arg2, ctr_x, elist[i].y + img_enemy[15]->h / 2, 5);
 									playnoise(E_SHOT, rate, ctr_x);
 								}
 							}
 							break;
 
-						case 15:
-						case 16:
-						case 17:             // space station!
+						case 17:
+						case 18:
+						case 19:             // space station!
 							boss_timer += urate;
 							if (boss_timer >= 400)      //animate
 							{
 								boss_timer -= 400;
 								elist[i].type++;
-								if (elist[i].type == 18) elist[i].type = 15;
+								if (elist[i].type == 20) elist[i].type = 17;
 							}
 
 							// move onto screen
@@ -1099,13 +1106,13 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 									}
 
 									// now actually TAKE the action
-									int ctr_x = elist[i].x + img_enemy[15]->w / 2;
-									int ctr_y = elist[i].y + img_enemy[15]->h / 2;
+									int ctr_x = elist[i].x + img_enemy[17]->w / 2;
+									int ctr_y = elist[i].y + img_enemy[17]->h / 2;
 
 									switch (elist[i].arg1) {
 									case 0:				// time draining bomb
 										if (elist[i].arg2 == 0) {
-											createenemy(10, ctr_x, ctr_y, 0, 0);
+											createenemy(12, ctr_x - img_enemy[11]->w / 2, ctr_y, 0, 0);
 											playnoise(E_LAUNCH, rate, ctr_x);
 										}
 										break;
@@ -1113,25 +1120,25 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 										if (elist[i].arg2 % 7 != 0 && elist[i].arg2 < 50) {
 											j = 128.0 / M_PI * atan2(ctr_y - (shipy + img_player[shipimg]->h / 2), (shipx + img_player[shipimg]->w / 2) - ctr_x);
 											j &= 0xFF;
-											createbullet(5, j, ctr_x, ctr_y, 7.5);
+											createbullet(5, j, ctr_x, ctr_y, 5);
 											playnoise(E_SHOT, rate, ctr_x);
 										}
 										break;
 									case 2:				// brick walls
 										if (elist[i].arg2 % 50 == 5) {
-											createenemy(7, 0, -32, 0, 0);
-											createenemy(7, 84, -32, 0, 0);
-											createenemy(7, 184, -32, 0, 0);
-											createenemy(7, 584, -32, 0, 0);
-											createenemy(7, 684, -32, 0, 0);
-											createenemy(7, 768, -32, 0, 0);
+											createenemy(9, 0, -32, 0, 0);
+											createenemy(9, 84, -32, 0, 0);
+											createenemy(9, 184, -32, 0, 0);
+											createenemy(9, 584, -32, 0, 0);
+											createenemy(9, 684, -32, 0, 0);
+											createenemy(9, 768, -32, 0, 0);
 											playnoise(E_LAUNCH, rate, ctr_x);
 										}
 										break;
 									case 3:				// rocket salvo
-										if (elist[i].arg2 % 20 == 0) {
+										if (elist[i].arg2 % 25 == 0) {
 											for (j = 0; j <= 4; j++)
-												createenemy(12, ctr_x + (32 * (j - 2)), ctr_y, 1, 160 * 16+j);
+												createenemy(14, ctr_x + (32 * (j - 2)) - img_enemy[12]->w / 2, ctr_y, 24 * (j - 2), 16);
 											playnoise(E_LAUNCH, rate, ctr_x);
 										}
 										break;
@@ -1140,7 +1147,7 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 										{
 											createenemy(2, 184, -32, 0, -13);
 											createenemy(2, 584, -32, 128, 13);
-											createenemy(5, 384, -32, 484, 0);
+//											createenemy(5, 384, -32, 484, 0);
 											playnoise(E_LAUNCH, rate, ctr_x);
 										}
 										break;
@@ -1149,7 +1156,7 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 							}
 
 							break;
-						case 18:                // shotgun boss
+						case 20:                // shotgun boss
 							elist[i].timer += urate;
 
 							if (elist[i].timer >= 4000) {
@@ -1181,7 +1188,7 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 								elist[i].arg1 = (elist[i].arg1 + 1) % 8;
 
 								// create bullet spread
-								int ctr_x = elist[i].x + img_enemy[17]->w / 2;
+								int ctr_x = elist[i].x + img_enemy[19]->w / 2;
 								for (j = 129; j < gap - 4; j ++)
 									createbullet(2, j, ctr_x, elist[i].y, 4);
 
@@ -1194,58 +1201,58 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 							}
 
 							break;
-						case 19:               //dcboss
+						case 21:               //dcboss
 							elist[i].x += urate * SCROLLSPEED * elist[i].arg1;
 
 							if (elist[i].x <= 128) elist[i].arg1 = 1;
-							else if (elist[i].x + img_enemy[18]->w >= 672) elist[i].arg1 = -1;
+							else if (elist[i].x + img_enemy[20]->w >= 672) elist[i].arg1 = -1;
 
 							elist[i].timer += urate;
 
 							if (elist[i].timer > 5000) {
 								elist[i].timer -= 5000;
-								int ctr_x = elist[i].x + img_enemy[18]->w / 2;
-								createenemy(5, ctr_x - img_enemy[4]->w / 2, elist[i].y + img_enemy[18]->h, shipy + img_player[shipimg]->h / 2 - img_enemy[4]->h / 2, 0);
+								int ctr_x = elist[i].x + img_enemy[20]->w / 2;
+								createenemy(5, ctr_x - img_enemy[4]->w / 2, elist[i].y + img_enemy[20]->h, shipy + img_player[shipimg]->h / 2 - img_enemy[4]->h / 2, 0);
 								playnoise(E_LAUNCH, rate, ctr_x);
 							}
 
 							break;
 
-						case 20:               //laser boss
+						case 22:               //laser boss
 							elist[i].timer += urate;
 							if (elist[i].timer >= 1000)
 							{
 								elist[i].timer -= 1000;
 								j = 128.0 / M_PI * atan2(
-									(elist[i].y + img_enemy[19]->h / 2) - (shipy + img_player[shipimg]->h / 2),
-									(shipx + img_player[shipimg]->w / 2) - (elist[i].x + img_enemy[19]->w / 2));
+									(elist[i].y + img_enemy[21]->h / 2) - (shipy + img_player[shipimg]->h / 2),
+									(shipx + img_player[shipimg]->w / 2) - (elist[i].x + img_enemy[21]->w / 2));
 
-								createenemy(14, elist[i].x + (img_enemy[19]->w - img_enemy[13]->w) / 2, elist[i].y + (img_enemy[19]->h - img_enemy[13]->h) / 2, 900, j & 0xFF);
+								createenemy(16, elist[i].x + (img_enemy[21]->w - img_enemy[15]->w) / 2, elist[i].y + (img_enemy[21]->h - img_enemy[15]->h) / 2, 900, j & 0xFF);
 							}
 							break;
-						case 21:               //rocket boss
+						case 23:               //rocket boss
 							elist[i].x += SCROLLSPEED * urate * elist[i].arg1;
 
 							if (elist[i].x <= 250) elist[i].arg1 = 1;
-							else if (elist[i].x + img_enemy[18]->w >= 550) elist[i].arg1 = -1;
+							else if (elist[i].x + img_enemy[22]->w >= 550) elist[i].arg1 = -1;
 
 							elist[i].timer += urate;
-							if (elist[i].timer >= 3000) {
-								elist[i].timer -= 3000;
-								createenemy(11, elist[i].x, elist[i].y + 48, 1, 160);
-								createenemy(12, elist[i].x - 4 + 64, elist[i].y + 64, 1, 192);
-								createenemy(13, elist[i].x - 8 + 128, elist[i].y + 48, 1, 224);
+							if (elist[i].timer >= 1500) {
+								elist[i].timer -= 1500;
+								createenemy(13, elist[i].x, elist[i].y + 48, -32, 16);
+								createenemy(14, elist[i].x - 4 + 64, elist[i].y + 64, 0, 16);
+								createenemy(15, elist[i].x - 8 + 128, elist[i].y + 48, 32, 16);
 
 								//								int ctr_x = elist[i].x + (64 << 5);
 								playnoise(E_LAUNCH, rate, elist[i].x + 64);
 							}
 
 							break;
-						case 22:               //spinner boss
+						case 24:               //spinner boss
 							elist[i].x += urate * SCROLLSPEED * elist[i].arg1;
 
 							if (elist[i].x <= 128) elist[i].arg1 = 1;
-							else if (elist[i].x + img_enemy[18]->w >= 672) elist[i].arg1 = -1;
+							else if (elist[i].x + img_enemy[23]->w >= 672) elist[i].arg1 = -1;
 
 							elist[i].timer += urate;
 
@@ -1278,8 +1285,8 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 									);
 
 								// boss explosion
-								if (elist[i].type > 14) {
-									if (elist[i].type < 18)
+								if (elist[i].type > 16) {
+									if (elist[i].type < 20)
 										// Just for fun, make one of these big blue bombs go off.
 										createexplosion(5, ctr_x, ctr_y);
 									// some other scattered explosions for bosses
