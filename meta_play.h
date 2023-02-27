@@ -13,6 +13,6 @@
 
 // Master control function for this state
 struct env_t;
-int state_play(struct env_t* env);
+int state_play(struct env_t * env);
 
 #endif

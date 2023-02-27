@@ -4,11 +4,11 @@
 
 #include <SDL/SDL.h>
 #ifdef __APPLE__
-	#include "SDL_mixer/SDL_mixer.h"
-	#include "SDL_image/SDL_image.h"
+#include "SDL_mixer/SDL_mixer.h"
+#include "SDL_image/SDL_image.h"
 #else
-	#include <SDL/SDL_mixer.h>
-	#include <SDL/SDL_image.h>
+#include <SDL/SDL_mixer.h>
+#include <SDL/SDL_image.h>
 #endif
 
 // Major Gamestates
@@ -34,11 +34,10 @@
 
 /* Struct declaration of common game objects
     These are shared across multiple major states at once */
-struct env_t
-{
+struct env_t {
 	// Screen surface and mouse cursor image
-	SDL_Surface* screen;
-	SDL_Surface* cursor;
+	SDL_Surface * screen;
+	SDL_Surface * cursor;
 
 	// Music and SFX enabled (checkboxes)
 	int sfx_works, mus_works;
@@ -54,7 +53,7 @@ struct env_t
 	int hs_red[3];
 	int hs_green[3];
 	int hs_blue[3];
-	
+
 	// cheat keys enabled?
 	int debug;
 };
@@ -64,10 +63,10 @@ int init_common(void);
 void free_common(void);
 
 /* common functions used across all modules */
-SDL_Surface* load_image(const char* path, int alpha);
-Mix_Music* load_music(const char* path, int autoplay);
-Mix_Chunk* load_sample(const char* path);
+SDL_Surface * load_image(const char * path, int alpha);
+Mix_Music * load_music(const char * path, int autoplay);
+Mix_Chunk * load_sample(const char * path);
 
-void blit_number(SDL_Surface* dest, unsigned int x, unsigned int y, int number);
+void blit_number(SDL_Surface * dest, unsigned int x, unsigned int y, int number);
 
 #endif

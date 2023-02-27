@@ -4,7 +4,7 @@
 
 struct env_t;
 
-int state_victory(struct env_t* env, int score);
-int state_gameover(struct env_t* env, int score);
+int state_victory(struct env_t * env, int score);
+int state_gameover(struct env_t * env, int score);
 
 #endif

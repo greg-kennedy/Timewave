@@ -3,6 +3,6 @@
 #define KEYCONF_H_
 
 struct env_t;
-int state_keyconf(struct env_t* env);
+int state_keyconf(struct env_t * env);
 
 #endif

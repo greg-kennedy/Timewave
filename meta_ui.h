@@ -11,6 +11,6 @@
 
 // Master control function for this state
 struct env_t;
-int state_ui(struct env_t* env, int arcade_mode);
+int state_ui(struct env_t * env, int arcade_mode);
 
 #endif

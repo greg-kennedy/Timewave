@@ -3,6 +3,6 @@
 #define HS_H_
 
 struct env_t;
-int state_hs(struct env_t* env, int arcade_mode);
+int state_hs(struct env_t * env, int arcade_mode);
 
 #endif

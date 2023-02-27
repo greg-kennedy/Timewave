@@ -2,12 +2,13 @@
 
 /* ************************************************************************************************************* */
 // File-level globals
-static SDL_Surface* numbers;
+static SDL_Surface * numbers;
 
 /* ************************************************************************************************************* */
 int init_common(void)
 {
 	numbers = load_image("img/ui/nums.png", 3);
+
 	if (numbers == NULL) return 1;
 
 	return 0;
@@ -20,47 +21,45 @@ void free_common(void)
 
 /* ************************************************************************************************************* */
 /* load an image from a file */
-SDL_Surface* load_image(const char* path, const int alpha)
+SDL_Surface * load_image(const char * path, const int alpha)
 {
-	SDL_Surface* img = IMG_Load(path);
-	if (img == NULL)
-	{
+	SDL_Surface * img = IMG_Load(path);
+
+	if (img == NULL) {
 		fprintf(stderr, "load_image: ERROR: Failed to load image '%s': %s\n", path, IMG_GetError());
 		return NULL;
 	}
 
-	if (alpha)
-	{
+	if (alpha) {
 		// try to set the alpha chanel to Magic Pink
 		int flags = SDL_SRCCOLORKEY;
+
 		// RLE acceleration enabled by setting bit 2 - this is good for bg and overlay,
 		//  not so much for bullets and enemy images
 		if (alpha & 0x02) flags |= SDL_RLEACCEL;
+
 		if (SDL_SetColorKey(img, flags, SDL_MapRGB(img->format, 0xFF, 0x00, 0xFF)) != 0)
 			fprintf(stderr, "load_image_alpha: Warning: Failed to set color key for image '%s': %s\n", path, SDL_GetError());
 	}
 
 	// convert loaded surface to our display format
-	SDL_Surface* conv = SDL_DisplayFormat(img);
+	SDL_Surface * conv = SDL_DisplayFormat(img);
 
-	if (conv == NULL)
-	{
+	if (conv == NULL) {
 		fprintf(stderr, "load_image: Warning: Failed to convert image '%s': %s\n", path, SDL_GetError());
-
 		// the original may still be usable though
 		return img;
 	}
 
 	// don't need img any more
 	SDL_FreeSurface(img);
-
 	return conv;
 }
 
 /* load and (maybe) play some music */
-Mix_Music* load_music(const char* path, const int autoplay)
+Mix_Music * load_music(const char * path, const int autoplay)
 {
-	Mix_Music* music = Mix_LoadMUS(path);
+	Mix_Music * music = Mix_LoadMUS(path);
 
 	if (music != NULL) {
 		/* loaded OK... if mus_on, try playing it too */
@@ -78,9 +77,9 @@ Mix_Music* load_music(const char* path, const int autoplay)
 	return music;
 }
 
-Mix_Chunk* load_sample(const char* path)
+Mix_Chunk * load_sample(const char * path)
 {
-	Mix_Chunk* sample = Mix_LoadWAV(path);
+	Mix_Chunk * sample = Mix_LoadWAV(path);
 
 	if (!sample)
 		fprintf(stderr, "load_sample(%s): Warning: Mix_LoadWAV returned NULL: %s\n", path, Mix_GetError());
@@ -90,12 +89,11 @@ Mix_Chunk* load_sample(const char* path)
 
 /* write a number using the numbers format to screen
 	this is funny because it's right-to-left but whatever */
-void blit_number(SDL_Surface* dest, const unsigned int x, const unsigned int y, int number)
+void blit_number(SDL_Surface * dest, const unsigned int x, const unsigned int y, int number)
 {
 	SDL_Rect dstrect;
 	dstrect.x = x;
 	dstrect.y = y;
-
 	SDL_Rect srcrect;
 	srcrect.h = 32;
 	srcrect.w = 24;

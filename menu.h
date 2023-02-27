@@ -4,6 +4,6 @@
 
 struct env_t;
 typedef struct _Mix_Music Mix_Music;
-int state_menu(struct env_t* env, Mix_Music* music);
+int state_menu(struct env_t * env, Mix_Music * music);
 
 #endif

@@ -4,6 +4,6 @@
 
 struct env_t;
 typedef struct _Mix_Music Mix_Music;
-int state_hspick(struct env_t* env, Mix_Music* music_pause, int score);
+int state_hspick(struct env_t * env, Mix_Music * music_pause, int score);
 
 #endif
