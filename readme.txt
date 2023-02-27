@@ -1,7 +1,7 @@
-TIMEWAVE - Version 1.2
+TIMEWAVE - Version 1.3
 Greg Kennedy
 kennedy.greg@gmail.com
-http://nwserver.webhop.org
+https://greg-kennedy.com
 
 ---
 Introduction
@@ -37,32 +37,27 @@ space:		fire
 left ctrl:	"fast forward"
 left shift:	"slow motion"
 
-space:		start game
+enter:		start game
 p:		pause
 esc:		exit to menu
 
 ---
-Controls (joystick)
+Default controls (joystick)
 ---
 directions:	move your ship
-Button 1:	"slow motion" / Start
-Button 2:	fire
+Button 1:	fire / Start
+Button 2:	"slow motion"
 Button 3:	"fast forward"
+Button 4:	pause
 
 ---
-Changes in version 1.2
+Changes in version 1.3
 ---
-* Reduction in resource file sizes: some items converted to 256-color,
-  optipng and audio editing shaved further bytes.
-* Renamed hiscore.dat to config.ini, and added more options.
-* New command line options: -f (switch to Fullscreen mode), -c (Create Config:
-  just write config.ini and exit), -w (switch to Windowed mode)
-* Added a "Change Keys" button which allows users to alter the inputs.
-* Added "Arcade Mode" switch to the config.ini file.  This causes the game to
-  simulate an arcade machine on Free Play: the title screen rotates with the
-  high score table.
-* The arrow keys now drive the cursor on the high score color picker table.
-* Mac OSX port (PPC / Intel Universal Binary, 10.4 or greater).
+* Numerous internal changes for performance and stability
+* Allow joystick button remapping in config.ini
+* Improved sound effect playback
+* Graphics changes for better visibility, difficulty tweaks
+* MSVC port and a build for Windows XP
 
 ---
 Credits
