@@ -109,7 +109,7 @@ static char* cfg_norm_key(const char* key)
 static struct cfg_node* cfg_create_node(char* key, char* value)
 {
   struct cfg_node* cur =
-    (cfg_node *)cfg_malloc(sizeof(struct cfg_node));
+    (struct cfg_node *)cfg_malloc(sizeof(struct cfg_node));
 
   /* assign key, value */
   cur->key = key;
@@ -131,7 +131,7 @@ static struct cfg_node* cfg_create_node(char* key, char* value)
 struct cfg_struct* cfg_init(void)
 {
   struct cfg_struct* cfg =
-    (cfg_struct *)cfg_malloc(sizeof(struct cfg_struct));
+    (struct cfg_struct *)cfg_malloc(sizeof(struct cfg_struct));
   cfg->head = NULL;
 
   return cfg;

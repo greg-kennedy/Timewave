@@ -5,17 +5,13 @@
 */
 #include "game.h"
 
+#include <limits.h>
+
 #define _USE_MATH_DEFINES
 #include <math.h>
 
 #ifndef min
 #define min(a,b)    (((a) < (b)) ? (a) : (b))
-#endif
-
-/* backfill for nextafterf on msvc */
-#ifndef nextafterf
-#include <float.h>
-#define nextafterf _nextafter
 #endif
 
 #include "common.h"
@@ -275,7 +271,7 @@ static void playnoise(const int sample, const int rate, const float x)
 		}
 
 		if (channel >= 0) {
-			int p = x * nextafterf(256.0f, 0) / 800.0f;
+			int p = x * 0.3199999630451202392578125f;
 			Mix_SetPanning(channel, 255 - p, p);
 		}
 	}
@@ -706,7 +702,7 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 				} else if (keysdown[1] != 0) {
 					shipy += (t_diff * SHIPSPEED);
 
-					if (shipy >= 600 - img_player[shipimg]->h) shipy = nextafterf(600 - img_player[shipimg]->h, 0);
+					if (shipy >= 600 - img_player[shipimg]->h) shipy = 599.99993896484375f - img_player[shipimg]->h;
 				}
 
 				if (keysdown[2] != 0) {
@@ -718,7 +714,7 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 					shipimg = 2;
 					shipx += (t_diff * SHIPSPEED);
 
-					if (shipx >= 800 - img_player[shipimg]->w) shipx = nextafterf(800 - img_player[shipimg]->w, 0);
+					if (shipx >= 800 - img_player[shipimg]->w) shipx = 799.99993896484375f - img_player[shipimg]->w;
 				}
 				else shipimg = 1;
 
@@ -743,7 +739,7 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 					rate = 2;
 					speedbar += t_diff * BARSPEED;
 
-					if (speedbar >= 769) speedbar = nextafterf(769, 0);
+					if (speedbar > 769) speedbar = 768.99993896484375f;
 				} else
 					rate = 1;
 
