@@ -143,7 +143,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="sdl.lib sdlmain.lib sdl_mixer.lib sdl_image.lib"
-				LinkIncremental="2"
+				LinkIncremental="1"
 				AdditionalLibraryDirectories="C:\Libs\lib\x86"
 				GenerateManifest="true"
 				IgnoreAllDefaultLibraries="false"
@@ -186,7 +186,7 @@
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
 			<File
-				RelativePath=".\cfg_parse\cfg_parse.h"
+				RelativePath=".\cfg_parse.h"
 				>
 			</File>
 			<File
@@ -250,7 +250,7 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath=".\cfg_parse\cfg_parse.c"
+				RelativePath=".\cfg_parse.c"
 				>
 			</File>
 			<File

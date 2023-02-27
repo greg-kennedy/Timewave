@@ -5,7 +5,7 @@
 #endif
 
 // config file parsing
-#include "cfg_parse/cfg_parse.h"
+#include "cfg_parse.h"
 
 // common includes and GLOBALS
 #include "common.h"

@@ -1,0 +1,23 @@
+TARGETNAME=Timewave
+TARGETTYPE=PROGRAM
+
+UMTYPE=windows
+UMENTRY=main
+
+SOURCES = common.c game.c hs.c hspick.c keyconf.c main.c menu.c meta_play.c meta_ui.c title.c winlose.c cfg_parse.c timewave.rc
+USE_MSVCRT=1
+
+386_STDCALL=0
+
+BUILD_ALLOW_ALL_WARNINGS=1
+MSC_OPTIMIZATION=/O2
+LINK_TIME_CODE_GENERATION=1
+MSC_WARNING_LEVEL=/W1
+
+USER_C_FLAGS=/D"_WINDOWS" /TP /GS- /Oy /fp:fast
+
+LINKER_FLAGS=/INCREMENTAL:NO /MANIFEST:NO /SUBSYSTEM:WINDOWS /OPT:REF /OPT:ICF /MACHINE:X86
+
+UMLIBS=C:\Libs\lib\x86\SDL.lib C:\Libs\lib\x86\SDL_Image.lib C:\Libs\lib\x86\SDL_Mixer.lib C:\Libs\lib\x86\SDLMain.lib
+
+INCLUDES=C:\Libs\include

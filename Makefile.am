@@ -12,5 +12,4 @@ timewave_SOURCES = common.c \
 		meta_ui.c \
 		title.c \
 		winlose.c \
-		cfg_parse/cfg_parse.c
-
+		cfg_parse.c
