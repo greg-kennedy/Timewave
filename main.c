@@ -171,7 +171,6 @@ int main(int argc, char * argv[])
 
 	if (SDL_InitSubSystem(SDL_INIT_JOYSTICK) != 0)
 		fprintf(stderr, "Couldn't initialize SDL Joystick subsystem: %s\n", SDL_GetError());
-
 	else {
 		if (SDL_NumJoysticks() > 0) {
 			joy = SDL_JoystickOpen(0);

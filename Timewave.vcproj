@@ -63,7 +63,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="sdl.lib sdlmain.lib sdl_mixer.lib sdl_image.lib"
+				AdditionalDependencies="sdl.lib sdlmain.lib sdl_mixer.lib sdl_image.lib zlib1.lib"
 				LinkIncremental="2"
 				AdditionalLibraryDirectories="C:\Libs\lib\x86"
 				GenerateManifest="true"
@@ -142,7 +142,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="sdl.lib sdlmain.lib sdl_mixer.lib sdl_image.lib"
+				AdditionalDependencies="sdl.lib sdlmain.lib sdl_mixer.lib sdl_image.lib zlib1.lib"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="C:\Libs\lib\x86"
 				GenerateManifest="true"

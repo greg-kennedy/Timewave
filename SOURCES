@@ -18,6 +18,6 @@ USER_C_FLAGS=/D"_WINDOWS" /TP /GS- /Oy /fp:fast
 
 LINKER_FLAGS=/INCREMENTAL:NO /MANIFEST:NO /SUBSYSTEM:WINDOWS /OPT:REF /OPT:ICF /MACHINE:X86
 
-UMLIBS=C:\Libs\lib\x86\SDL.lib C:\Libs\lib\x86\SDL_Image.lib C:\Libs\lib\x86\SDL_Mixer.lib C:\Libs\lib\x86\SDLMain.lib
+UMLIBS=C:\Libs\lib\x86\SDL.lib C:\Libs\lib\x86\SDL_Image.lib C:\Libs\lib\x86\SDL_Mixer.lib C:\Libs\lib\x86\SDLMain.lib C:\Libs\lib\x86\zlib1.lib
 
 INCLUDES=C:\Libs\include

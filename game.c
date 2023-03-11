@@ -18,6 +18,8 @@
 
 #include "meta_play.h"
 
+#include <zlib.h>
+
 #define SCROLLSPEED 1.0/15.0
 #define EXPLOSPEED 0.005
 #define SHIPSPEED 0.25
@@ -136,7 +138,7 @@ static SDL_Surface * img_explo[MAXEXP * 5];
 int init_game(struct env_t * env)
 {
 	int i;
-	char buffer[30];
+	char buffer[32] = "";
 	/* LOAD ALL IMAGES */
 	bg = load_image("img/gfx/bg.png", 0);
 	img_pause = load_image("img/ui/paused.png", 3);
@@ -443,25 +445,29 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 	// NON-PRELOADED Resources
 	SDL_Surface * strips[MAXSTRIPS] = {NULL};
 	/* LOAD DATA FILES FOR LEVEL */
-	char buffer[30];
+	char buffer[32] = "";
 	unsigned char stripslist[LVLSIZE] = { 0 };
 	struct spawninfo slist[ALLSPAWN] = { { 0 } };
 	sprintf(buffer, "data/%d.lvl", level);
-	FILE * fp = fopen(buffer, "r");
-	fscanf(fp, "%d\n", &j);
+	gzFile fp = gzopen(buffer, "r");
+	gzgets(fp, buffer, sizeof(buffer));
+	sscanf(buffer, "%d\n", &j);
 
 	for (i = 0; i < j; i++) {
+		gzgets(fp, buffer, sizeof(buffer));
 		int line = 0;
-		fscanf(fp, "%d\n", &line);
+		sscanf(buffer, "%d\n", &line);
 		stripslist[i] = line;
 	}
 
-	fscanf(fp, "%d\n", &j);
+	gzgets(fp, buffer, sizeof(buffer));
+	sscanf(buffer, "%d\n", &j);
 
 	for (i = 0; i < j; i++) {
+		gzgets(fp, buffer, sizeof(buffer));
 		int line[6] = { 0 };
 		// this is a workaround for MSVC not supporting %hhu formats
-		fscanf(fp, "%d %d %d %d %d %d\n", &line[0], &line[1], &line[2], &line[3], &line[4], &line[5]);
+		sscanf(buffer, "%d %d %d %d %d %d\n", &line[0], &line[1], &line[2], &line[3], &line[4], &line[5]);
 		slist[i].when = line[0];
 		slist[i].type = line[1];
 		slist[i].x = line[2];
@@ -470,7 +476,7 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 		slist[i].arg2 = line[5];
 	}
 
-	fclose(fp);
+	gzclose(fp);
 	Mix_Music * music = NULL;
 
 	if (env->mus_works && env->mus_on) {
@@ -806,9 +812,11 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 						if (explo[i].timer >= 5) {
 							// bit of a hack, but: if this was the Boss Explosion, it's victory
 							//  and if it was the Player Explosion, game over!
-							if (explo[i].type == 3)
+							if (explo[i].type == 3) {
+								// you can get 1000 points per remaining life now
+								*score += 1000 * lives;
 								state = STATE_VICTORY;
-							else if (explo[i].type == 1 && lives <= 0)
+							} else if (explo[i].type == 1 && lives <= 0)
 								state = STATE_GAMEOVER;
 							else
 								explo[i].type = 0;
@@ -897,7 +905,7 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 									(elist[i].x < elist[i].arg1 && elist[i].arg2 < 0))) {
 								elist[i].timer = 1;
 								float ctr_x = elist[i].x + img_enemy[2]->w / 2;
-								createenemy(14, ctr_x - img_enemy[12]->w / 2, elist[i].y + img_enemy[2]->h, 0, 16);
+								createenemy(14, ctr_x - img_enemy[13]->w / 2, elist[i].y + img_enemy[2]->h, 0, 16);
 								playnoise(E_LAUNCH, rate, ctr_x);
 							}
 
@@ -1059,8 +1067,8 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 								// rotate missile towards player
 								//  determine angle to player
 								double angle = atan2(
-										(shipy + img_player[shipimg]->h / 2) - (elist[i].y + img_enemy[12]->h / 2),
-										(shipx + img_player[shipimg]->w / 2) - (elist[i].x + img_enemy[12]->w / 2));
+										(shipy + img_player[shipimg]->h / 2) - (elist[i].y + img_enemy[13]->h / 2),
+										(shipx + img_player[shipimg]->w / 2) - (elist[i].x + img_enemy[13]->w / 2));
 
 								// only adjust speed if angle is within certain ranges
 								if (angle >= M_PI / 4 && angle <= 3 * M_PI / 4) {
@@ -1167,7 +1175,7 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 									case 3:				// rocket salvo
 										if (elist[i].arg2 % 25 == 0) {
 											for (j = 0; j <= 4; j++)
-												createenemy(14, ctr_x + (32 * (j - 2)) - img_enemy[12]->w / 2, ctr_y, 24 * (j - 2), 16);
+												createenemy(14, ctr_x + (32 * (j - 2)) - img_enemy[13]->w / 2, ctr_y, 24 * (j - 2), 16);
 
 											playnoise(E_LAUNCH, rate, ctr_x);
 										}
