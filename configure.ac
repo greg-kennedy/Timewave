@@ -1,4 +1,4 @@
-AC_INIT([timewave], [1.3], [kennedy.greg@gmail.com])
+AC_INIT([timewave], [1.3.1], [kennedy.greg@gmail.com])
 
 AC_CONFIG_MACRO_DIRS([m4])
 
@@ -7,6 +7,7 @@ AM_INIT_AUTOMAKE([foreign])
 AC_PROG_CC
 
 AC_CHECK_LIB([m],[atan2])
+AC_CHECK_LIB([z],[zlibVersion])
 
 dnl Check for SDL
 SDL_VERSION=1.2.0

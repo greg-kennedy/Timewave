@@ -1,5 +1,114 @@
 #include "common.h"
 
+#include <zlib.h>
+#include <SDL/SDL_rwops.h>
+
+/* ************************************************************************************************************* */
+// RWops wrappers for gzip (zlib)
+static void sdl_rwops_gzperror(const gzFile file, const char * caller)
+{
+	int errnum;
+	const char * message = gzerror(file, &errnum);
+	fprintf(stderr, "zlib error in %s: %s\n", caller, message);
+
+	if (errnum == Z_ERRNO) perror("\tZ_ERRNO detail");
+}
+
+static int SDLCALL sdl_rwops_gzread(SDL_RWops * context, void * ptr, int size, int maxnum)
+{
+//	z_size_t ret = gzfread(ptr, size, maxnum, context->hidden.unknown.data1);
+	int ret = gzread(context->hidden.unknown.data1, ptr, size * maxnum) / size;
+
+	if (ret == 0 && !gzeof(context->hidden.unknown.data1))
+		sdl_rwops_gzperror(context->hidden.unknown.data1, "gzread");
+
+	return ret;
+}
+
+static int SDLCALL sdl_rwops_gzseek(SDL_RWops * context, int offset, int whence)
+{
+	// workaround for SEEK_END
+	if (whence == 2) {
+		// seek way past the end
+		//  this ought to return INT_MAX
+		int ret = sdl_rwops_gzseek(context, INT_MAX, 0);
+
+		if (ret == -1) {
+			// hmm some kind of weird error there
+			return -1;
+		} else if (ret != INT_MAX)
+			fputs("Warning: gzseek(INT_MAX) did not return INT_MAX\n", stderr);
+
+		// do a dummy read of 1 byte - this will always fail but should set us to eof
+		char dummy;
+		ret = sdl_rwops_gzread(context, &dummy, 1, 1);
+
+		if (ret != 0) {
+			// this was supposed to fail...
+			fputs("Warning: gzread past eof did not return 0\n", stderr);
+		}
+
+		// great now we can seek relative to *current* position
+		whence = 1;
+	}
+
+	z_off_t ret = gzseek(context->hidden.unknown.data1, offset, whence);
+
+	if (ret == -1)
+		sdl_rwops_gzperror(context->hidden.unknown.data1, "gzseek");
+
+	return ret;
+}
+
+static int SDLCALL sdl_rwops_gzclose(SDL_RWops * context)
+{
+//	int ret = gzclose_r(context->hidden.unknown.data1);
+	int ret = gzclose(context->hidden.unknown.data1);
+
+	switch (ret) {
+	case Z_STREAM_ERROR:
+		fputs("gzclose_r: Z_STREAM_ERROR: file is not valid\n", stderr);
+		break;
+
+	case Z_MEM_ERROR:
+		fputs("gzclose_r: Z_MEM_ERROR: out of memory\n", stderr);
+		break;
+
+	case Z_BUF_ERROR:
+		fputs("gzclose_r: Z_BUF_ERROR: last read ended in the middle of a gzip stream\n", stderr);
+		break;
+
+	case Z_ERRNO:
+		perror("gzclose_r: Z_ERRNO: file operation error");
+	}
+
+	SDL_FreeRW(context);
+	return ret;
+}
+
+SDL_RWops * sdl_gzopen(const char * file)
+{
+	SDL_RWops * rwops = SDL_AllocRW();
+
+	if (!rwops)
+		return NULL;
+
+	rwops->hidden.unknown.data1 = gzopen(file, "r");
+
+	if (rwops->hidden.unknown.data1 == NULL) {
+		fputs("gzopen returned NULL: ", stderr);
+		perror(file);
+		SDL_FreeRW(rwops);
+		return NULL;
+	}
+
+	rwops->seek  = sdl_rwops_gzseek;
+	rwops->read  = sdl_rwops_gzread;
+	rwops->write = NULL;
+	rwops->close = sdl_rwops_gzclose;
+	return rwops;
+}
+
 /* ************************************************************************************************************* */
 // File-level globals
 static SDL_Surface * numbers;
@@ -59,7 +168,15 @@ SDL_Surface * load_image(const char * path, const int alpha)
 /* load and (maybe) play some music */
 Mix_Music * load_music(const char * path, const int autoplay)
 {
-	Mix_Music * music = Mix_LoadMUS(path);
+	SDL_RWops * gz = sdl_gzopen(path);
+
+	if (! gz) {
+		fprintf(stderr, "load_music(%s): Warning: sdl_gzopen failed\n", path);
+		return NULL;
+	}
+
+	Mix_Music * music = Mix_LoadMUS_RW(gz);
+	SDL_RWclose(gz);
 
 	if (music != NULL) {
 		/* loaded OK... if mus_on, try playing it too */
@@ -71,7 +188,7 @@ Mix_Music * load_music(const char * path, const int autoplay)
 		}
 	} else {
 		/* totally failed to load */
-		fprintf(stderr, "load_music(%s): Warning: Mix_LoadMUS returned NULL: %s\n", path, Mix_GetError());
+		fprintf(stderr, "load_music(%s): Warning: Mix_LoadMUS_RW returned NULL: %s\n", path, Mix_GetError());
 	}
 
 	return music;
@@ -79,7 +196,7 @@ Mix_Music * load_music(const char * path, const int autoplay)
 
 Mix_Chunk * load_sample(const char * path)
 {
-	Mix_Chunk * sample = Mix_LoadWAV(path);
+	Mix_Chunk * sample = Mix_LoadWAV_RW(sdl_gzopen(path), 1);
 
 	if (!sample)
 		fprintf(stderr, "load_sample(%s): Warning: Mix_LoadWAV returned NULL: %s\n", path, Mix_GetError());

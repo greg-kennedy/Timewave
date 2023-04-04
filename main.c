@@ -30,7 +30,7 @@ int main(int argc, char * argv[])
 {
 	int i;
 	int ret = EXIT_SUCCESS;
-	printf("Timewave v1.3 - Greg Kennedy 2016\n");
+	printf("Timewave v1.3.1 - Greg Kennedy 2023\n");
 	// ----------------------------------------------------------------------------
 	// This makes relative paths work in C++ in Xcode by changing directory to the Resources folder inside the .app bundle
 #ifdef __APPLE__

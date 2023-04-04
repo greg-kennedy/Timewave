@@ -1,4 +1,4 @@
-TIMEWAVE - Version 1.3
+TIMEWAVE - Version 1.3.1
 Greg Kennedy
 kennedy.greg@gmail.com
 https://greg-kennedy.com
@@ -51,12 +51,13 @@ Button 3:	"fast forward"
 Button 4:	pause
 
 ---
-Changes in version 1.3
+Changes in version 1.3.1
 ---
 * Numerous internal changes for performance and stability
 * Allow joystick button remapping in config.ini
 * Improved sound effect playback
 * Graphics changes for better visibility, difficulty tweaks
+* gzip compression of most resources
 * MSVC port and a build for Windows XP
 
 ---

@@ -170,31 +170,31 @@ int init_game(struct env_t * env)
 
 	/* Sound FX */
 	if (env->sfx_works && env->sfx_on) {
-		chunk_up = load_sample("audio/sup.wav");
-		chunk_down = load_sample("audio/sdn.wav");
-		chunk_sfx[SLOW][P_DIE] = load_sample("audio/sex2.wav");
-		chunk_sfx[SLOW][E_DIE] = load_sample("audio/sex1.wav");
-		chunk_sfx[SLOW][B_DIE] = load_sample("audio/sex3.wav");
-		chunk_sfx[SLOW][P_SHOT] = load_sample("audio/sbul2.wav");
-		chunk_sfx[SLOW][E_SHOT] = load_sample("audio/sbul1.wav");
-		chunk_sfx[SLOW][E_LAUNCH] = load_sample("audio/slaunch.wav");
-		chunk_sfx[NORMAL][P_DIE] = load_sample("audio/ex2.wav");
-		chunk_sfx[NORMAL][E_DIE] = load_sample("audio/ex1.wav");
-		chunk_sfx[NORMAL][B_DIE] = load_sample("audio/ex3.wav");
-		chunk_sfx[NORMAL][P_SHOT] = load_sample("audio/bul2.wav");
-		chunk_sfx[NORMAL][E_SHOT] = load_sample("audio/bul1.wav");
-		chunk_sfx[NORMAL][E_LAUNCH] = load_sample("audio/launch.wav");
-		chunk_sfx[FAST][P_DIE] = load_sample("audio/fex2.wav");
-		chunk_sfx[FAST][E_DIE] = load_sample("audio/fex1.wav");
-		chunk_sfx[FAST][B_DIE] = load_sample("audio/fex3.wav");
-		chunk_sfx[FAST][P_SHOT] = load_sample("audio/fbul2.wav");
-		chunk_sfx[FAST][E_SHOT] = load_sample("audio/fbul1.wav");
-		chunk_sfx[FAST][E_LAUNCH] = load_sample("audio/flaunch.wav");
+		chunk_up = load_sample("audio/sup.wav.gz");
+		chunk_down = load_sample("audio/sdn.wav.gz");
+		chunk_sfx[SLOW][P_DIE] = load_sample("audio/sex2.wav.gz");
+		chunk_sfx[SLOW][E_DIE] = load_sample("audio/sex1.wav.gz");
+		chunk_sfx[SLOW][B_DIE] = load_sample("audio/sex3.wav.gz");
+		chunk_sfx[SLOW][P_SHOT] = load_sample("audio/sbul2.wav.gz");
+		chunk_sfx[SLOW][E_SHOT] = load_sample("audio/sbul1.wav.gz");
+		chunk_sfx[SLOW][E_LAUNCH] = load_sample("audio/slaunch.wav.gz");
+		chunk_sfx[NORMAL][P_DIE] = load_sample("audio/ex2.wav.gz");
+		chunk_sfx[NORMAL][E_DIE] = load_sample("audio/ex1.wav.gz");
+		chunk_sfx[NORMAL][B_DIE] = load_sample("audio/ex3.wav.gz");
+		chunk_sfx[NORMAL][P_SHOT] = load_sample("audio/bul2.wav.gz");
+		chunk_sfx[NORMAL][E_SHOT] = load_sample("audio/bul1.wav.gz");
+		chunk_sfx[NORMAL][E_LAUNCH] = load_sample("audio/launch.wav.gz");
+		chunk_sfx[FAST][P_DIE] = load_sample("audio/fex2.wav.gz");
+		chunk_sfx[FAST][E_DIE] = load_sample("audio/fex1.wav.gz");
+		chunk_sfx[FAST][B_DIE] = load_sample("audio/fex3.wav.gz");
+		chunk_sfx[FAST][P_SHOT] = load_sample("audio/fbul2.wav.gz");
+		chunk_sfx[FAST][E_SHOT] = load_sample("audio/fbul1.wav.gz");
+		chunk_sfx[FAST][E_LAUNCH] = load_sample("audio/flaunch.wav.gz");
 	}
 
 	// BOSS music
 	if (env->mus_works && env->mus_on)
-		music_boss = load_music("audio/boss.mod", 0);
+		music_boss = load_music("audio/boss.mod.gz", 0);
 
 	return 0;
 }
@@ -448,8 +448,14 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 	char buffer[32] = "";
 	unsigned char stripslist[LVLSIZE] = { 0 };
 	struct spawninfo slist[ALLSPAWN] = { { 0 } };
-	sprintf(buffer, "data/%d.lvl", level);
+	sprintf(buffer, "data/%d.lvl.gz", level);
 	gzFile fp = gzopen(buffer, "r");
+
+	if (fp == NULL) {
+		fprintf(stderr, "Failed to open data file '%s', exiting...\n", buffer);
+		return STATE_ERROR;
+	}
+
 	gzgets(fp, buffer, sizeof(buffer));
 	sscanf(buffer, "%d\n", &j);
 
@@ -480,7 +486,7 @@ int state_game(struct env_t * env, Mix_Music * music_pause, const int level, int
 	Mix_Music * music = NULL;
 
 	if (env->mus_works && env->mus_on) {
-		sprintf(buffer, "audio/%d.mod", level);
+		sprintf(buffer, "audio/%d.mod.gz", level);
 		music = load_music(buffer, 1);
 	}
 

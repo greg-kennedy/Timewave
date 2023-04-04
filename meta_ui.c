@@ -16,7 +16,7 @@ int state_ui(struct env_t * env, const int arcade_mode)
 
 	// play the music for all UI items
 	if (env->mus_works)
-		music = load_music("audio/title.xm", env->mus_on);
+		music = load_music("audio/title.xm.gz", env->mus_on);
 
 	int substate = STATE_TITLE;
 
